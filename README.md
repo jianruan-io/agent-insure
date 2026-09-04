@@ -131,31 +131,45 @@ flowchart TD
 
 ### Architecture — v1 → v3
 
-Same system, three passes of detail — from the one-breath pitch to the full build target. Use v1 for a quick explain, v3 as what actually gets built; update v2/v3 as the implementation changes shape during the hackathon rather than editing this doc from scratch each time.
+Same system, three passes of detail — from the one-breath pitch to the full build target. Every version is colored by which sponsor's tech does the work, so the sponsor story stays visible at every fidelity, not just in the final diagram. Use v1 for a quick explain, v3 as what actually gets built; update v2/v3 as the implementation changes shape during the hackathon rather than editing this doc from scratch each time.
 
-#### v1 — the pitch, one breath
+**Color key (all three diagrams):** 🟣 Hedera · 🔵 ENS · 🟡 World
+
+#### v1 — the pitch, one breath: one box per sponsor
 
 ```mermaid
 flowchart LR
-    A["Agent pays vendors"] -->|"tricked by a hidden instruction"| B["Wrong payment sent"]
-    B --> C["Real human files a claim"]
-    C --> D{"Looks like fraud?"}
-    D -->|"yes"| E["Insurer pays the company back"]
-    D -->|"no"| F["Claim denied"]
+    ENS["ENS<br/>Agent's identity +<br/>locked spending rules"]:::ens --> HCS["Hedera<br/>Every payment logged,<br/>tamper-proof"]:::hedera
+    HCS -->|"a payment looks wrong"| WORLD["World<br/>Real human proves<br/>it's really them"]:::world
+    WORLD --> PAYOUT["Hedera<br/>Verified claim<br/>pays out"]:::hedera
+
+    classDef hedera fill:#7c5cff,color:#fff,stroke:#5a3fd6,stroke-width:1px
+    classDef ens fill:#4c82fb,color:#fff,stroke:#2f5fd1,stroke-width:1px
+    classDef world fill:#e0a825,color:#1a1a1a,stroke:#a97d13,stroke-width:1px
 ```
 
-#### v2 — the three sponsors show up
+Even at this fidelity, all three sponsors are load-bearing steps, not logos: ENS gates what the agent is *allowed* to do, Hedera proves what it *actually* did, World proves *who* is asking for money back.
+
+#### v2 — the specific product per sponsor, plus the agents
 
 ```mermaid
 flowchart TD
-    PA["PayableAgent pays vendors"] -->|"prompt-injected invoice"| BAD["Unauthorized payment"]
-    BAD --> LOG["Hedera Consensus Service<br/>logs it immutably"]
-    LOG --> G["Guardian passes a live<br/>World Selfie Check"]
-    G --> CLAIM["Claim filed"]
-    CLAIM --> INV["InvestigatorAgent checks<br/>Hedera Mirror Node + locked ENS scope"]
-    INV -->|"deviates from pattern"| PAY["PayoutAgent pays from the pool"]
-    INV -->|"matches pattern"| DENY["Claim denied"]
+    PA["PayableAgent<br/>pays vendors"] -->|"prompt-injected invoice"| BAD["Unauthorized payment"]
+    BAD --> HCS["Hedera Consensus Service<br/>logs it immutably"]:::hedera
+    HCS --> SELFIE["Guardian passes a live<br/>World Selfie Check"]:::world
+    SELFIE --> CLAIM["Claim filed"]
+    CLAIM --> MIRROR["Hedera Mirror Node<br/>InvestigatorAgent pulls the full history"]:::hedera
+    MIRROR --> SCOPE["ENS Permissioned Resolver<br/>locked spending-scope text records"]:::ens
+    SCOPE --> VERDICT{"Deviates from<br/>pattern + scope?"}
+    VERDICT -->|"yes"| PAY["PayoutAgent pays<br/>on Hedera"]:::hedera
+    VERDICT -->|"no"| DENY["Claim denied"]
+
+    classDef hedera fill:#7c5cff,color:#fff,stroke:#5a3fd6,stroke-width:1px
+    classDef ens fill:#4c82fb,color:#fff,stroke:#2f5fd1,stroke-width:1px
+    classDef world fill:#e0a825,color:#1a1a1a,stroke:#a97d13,stroke-width:1px
 ```
+
+Now each sponsor is tied to the specific product, not just the brand: **Hedera** shows up twice as two different services (Consensus Service to *write* the log, Mirror Node to *read* it back — the literal "AI agent executing a payment" + indexed-history bar from Hedera's own criteria); **ENS** is specifically the Permissioned Resolver + text records mechanism, not a display name; **World** is specifically the live Selfie Check, not a generic login.
 
 #### v3 — full architecture (current build target)
 
@@ -165,11 +179,11 @@ Chosen because it maps directly onto the fidelity-bond analogy — this is liter
 flowchart TD
     subgraph COMPANY["Company (Insured)"]
         REGISTER["Register PayableAgent + pay premium"]
-        SCOPE["ENS: declared scope, locked"]
+        SCOPE["ENS: declared scope, locked<br/>(Permissioned Resolver + text records)"]:::ens
         PAYABLE(["PayableAgent: pays vendors + sweeps cash"])
         NOTICE["Notices vendor was never paid"]
-        GUARDIAN["Guardian: real human,<br/>registered in ENS"]
-        SELFIE{"World Selfie Check<br/>passes?"}
+        GUARDIAN["Guardian: real human,<br/>registered in ENS"]:::ens
+        SELFIE{"World Selfie Check<br/>passes?"}:::world
         CLAIM["Files a claim"]
         PAID["Receives reimbursement"]
     end
@@ -181,22 +195,22 @@ flowchart TD
         SEND["Delivers it into PayableAgent's workflow"]
     end
 
-    LOG["Hedera: logs the compromised transaction"]
+    LOG["Hedera Consensus Service:<br/>logs the compromised transaction"]:::hedera
 
     subgraph INSURER["Insurance Protocol"]
         POOL[("Risk pool")]
         INTAKE["Receives the claim"]
 
         subgraph INVESTIGATOR["InvestigatorAgent"]
-            PULL["Pulls PayableAgent's history (Hedera Mirror Node)"]
-            CHECK["Compares against locked ENS scope"]
+            PULL["Pulls PayableAgent's history<br/>(Hedera Mirror Node)"]:::hedera
+            CHECK["Compares against locked ENS scope"]:::ens
             VERDICT{"Deviation = manipulation?"}
             SIGN["Signs verdict + payout %"]
         end
 
         subgraph PAYOUTAGENT["PayoutAgent"]
             VERIFY["Verifies Investigator's signed verdict"]
-            EXECUTE["Executes payout on Hedera"]
+            EXECUTE["Executes payout on Hedera"]:::hedera
         end
 
         DENY["Deny claim"]
@@ -213,6 +227,10 @@ flowchart TD
     VERDICT -- "yes, deviates from history + scope" --> SIGN --> VERIFY --> EXECUTE
     VERDICT -- "no, matches normal pattern" --> DENY
     POOL --> EXECUTE --> PAID
+
+    classDef hedera fill:#7c5cff,color:#fff,stroke:#5a3fd6,stroke-width:1px
+    classDef ens fill:#4c82fb,color:#fff,stroke:#2f5fd1,stroke-width:1px
+    classDef world fill:#e0a825,color:#1a1a1a,stroke:#a97d13,stroke-width:1px
 ```
 
 PayableAgent has paid this vendor 40 times, always to the same account. MaliciousAgent crafts the next invoice PDF with hidden white-on-white text — invisible to a human, but processed as data by PayableAgent while it extracts the payment details — instructing it to route this payment to a "new" account instead. PayableAgent can't structurally tell that injected text apart from a legitimate instruction, so it complies: same underlying scam (BEC) that already costs real businesses billions a year, but exploiting an AI-specific weakness rather than fooling a person. The transaction is logged immutably the instant it happens. The vendor eventually says they were never paid; Guardian — the real, ENS-registered human accountable for PayableAgent — goes to file a claim, and passes a live World Selfie Check to do it, so the claim carries a real identity, not just an agent's say-so. Only then does InvestigatorAgent pull the real payment history from Hedera Mirror Node — every prior payment went to account X, this one went to a brand-new account Y, first time ever, outside the ENS-declared vendor list — and sign a verdict that this is the signature of fraud, not a normal treasury decision. PayoutAgent independently verifies that signed verdict and pays the company back on Hedera.
