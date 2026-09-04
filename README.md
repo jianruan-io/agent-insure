@@ -139,73 +139,78 @@ flowchart TD
 
 ### Architecture — v1 → v3
 
-Same system, three passes of detail — from the one-breath pitch to the full build target. In every version each sponsor's tech sits inside its own bordered subgraph box — a real boundary, not just a colored node in a chain — so it's visually obvious where Hedera's job ends and ENS's or World's begins. Use v1 for a quick explain, v3 as what actually gets built; update v2/v3 as the implementation changes shape during the hackathon rather than editing this doc from scratch each time.
+Same system, three passes of detail — from the one-breath pitch to the full build target. Every version carries both boundaries as real bordered subgraph boxes, not labels or colored nodes in a chain: **who** — Northbeam Distributors (insured), the external attacker, Fidelis Agent Assurance (insurer) — and **which sponsor** — Hedera, ENS, World — nested inside whichever actor's box that touchpoint actually happens in. Use v1 for a quick explain, v3 as what actually gets built; update v2/v3 as the implementation changes shape during the hackathon rather than editing this doc from scratch each time.
 
 **Color key (all three diagrams):** 🟣 Hedera box · 🔵 ENS box · 🟡 World box
 
-#### v1 — the pitch, one breath: one box per sponsor
-
-```mermaid
-flowchart LR
-    subgraph ENS_SG["🔵 ENS"]
-        SCOPE1["Agent's identity +<br/>locked spending rules"]
-    end
-
-    subgraph HEDERA_SG["🟣 Hedera"]
-        LOG1["Payment logged,<br/>tamper-proof"]
-        PAYOUT1["Verified claim<br/>pays out"]
-    end
-
-    subgraph WORLD_SG["🟡 World"]
-        SELFIE1["Real human proves<br/>it's really them"]
-    end
-
-    SCOPE1 --> LOG1
-    LOG1 -->|"payment looks wrong"| SELFIE1
-    SELFIE1 --> PAYOUT1
-
-    style ENS_SG fill:#eaf1ff,stroke:#4c82fb,stroke-width:2px
-    style HEDERA_SG fill:#f1edff,stroke:#7c5cff,stroke-width:2px
-    style WORLD_SG fill:#fff6e0,stroke:#e0a825,stroke-width:2px
-```
-
-Even at this fidelity, all three sponsors are load-bearing boxes, not logos: ENS gates what the agent is *allowed* to do, Hedera proves what it *actually* did (both when it happened and when the payout goes out), World proves *who* is asking for money back.
-
-#### v2 — the specific product per sponsor, plus the agents
+#### v1 — the pitch, one breath: who + which sponsor, nothing else
 
 ```mermaid
 flowchart TD
-    PA["PayableAgent<br/>pays vendors"] -->|"prompt-injected invoice"| BAD["Unauthorized payment"]
-
-    subgraph HEDERA_SG["🟣 Hedera"]
-        HCS["Consensus Service<br/>logs it immutably"]
-        MIRROR["Mirror Node<br/>full transaction history"]
-        PAYOUT["Payout executed"]
+    subgraph NORTHBEAM1["Northbeam Distributors (Insured)"]
+        subgraph ENS_SG1["🔵 ENS"]
+            PA1["PayableAgent<br/>pays vendors"]
+        end
+        subgraph WORLD_SG1["🟡 World"]
+            GUARD1["Guardian proves<br/>it's really them"]
+        end
     end
 
-    subgraph WORLD_SG["🟡 World"]
-        SELFIE["Selfie Check<br/>Guardian proves it's them"]
+    subgraph ATTACKER1["External Attacker"]
+        MAL1["Tricks PayableAgent<br/>into a wrong payment"]
     end
 
-    subgraph ENS_SG["🔵 ENS"]
-        SCOPE["Permissioned Resolver<br/>locked spending-scope text records"]
+    subgraph FIDELIS1["Fidelis Agent Assurance (Insurer)"]
+        subgraph HEDERA_SG1["🟣 Hedera"]
+            INS1["Investigates the claim<br/>and pays out"]
+        end
     end
 
-    BAD --> HCS
-    HCS --> SELFIE
-    SELFIE --> CLAIM["Claim filed"]
-    CLAIM --> MIRROR
-    MIRROR --> SCOPE
-    SCOPE --> VERDICT{"Deviates from<br/>pattern + scope?"}
-    VERDICT -->|"yes"| PAYOUT
-    VERDICT -->|"no"| DENY["Claim denied"]
+    PA1 --> MAL1 --> GUARD1 --> INS1
 
-    style HEDERA_SG fill:#f1edff,stroke:#7c5cff,stroke-width:2px
-    style WORLD_SG fill:#fff6e0,stroke:#e0a825,stroke-width:2px
-    style ENS_SG fill:#eaf1ff,stroke:#4c82fb,stroke-width:2px
+    style ENS_SG1 fill:#eaf1ff,stroke:#4c82fb,stroke-width:2px
+    style WORLD_SG1 fill:#fff6e0,stroke:#e0a825,stroke-width:2px
+    style HEDERA_SG1 fill:#f1edff,stroke:#7c5cff,stroke-width:2px
 ```
 
-Now each sponsor's box is tied to the specific product, not just the brand: the **Hedera** box holds two different services (Consensus Service to *write* the log, Mirror Node to *read* it back — the literal "AI agent executing a payment" + indexed-history bar from Hedera's own criteria) plus the final payout; the **ENS** box is specifically the Permissioned Resolver + text records mechanism, not a display name; the **World** box is specifically the live Selfie Check, not a generic login.
+Three actors, three sponsors, one node each — this is the whole pitch in one breath: Northbeam (insured) runs PayableAgent on ENS-locked rules; an unaffiliated attacker manipulates it; Guardian (still Northbeam, still on the hook) proves who they are via World; Fidelis (insurer) investigates and pays via Hedera. Even at this fidelity nobody is a logo — every box is a real actor doing a real job.
+
+#### v2 — the specific product per sponsor, plus the named agents
+
+```mermaid
+flowchart TD
+    subgraph NORTHBEAM2["Northbeam Distributors (Insured)"]
+        subgraph ENS_SG2["🔵 ENS"]
+            PA2["PayableAgent<br/>pays vendors,<br/>locked spending scope"]
+        end
+        subgraph WORLD_SG2["🟡 World"]
+            GUARD2["Guardian passes a live<br/>Selfie Check to file a claim"]
+        end
+    end
+
+    subgraph ATTACKER2["External Attacker"]
+        MAL2["Crafts a prompt-injected<br/>vendor invoice"]
+    end
+
+    subgraph FIDELIS2["Fidelis Agent Assurance (Insurer)"]
+        subgraph HEDERA_SG2["🟣 Hedera"]
+            INV2["InvestigatorAgent:<br/>Mirror Node history +<br/>Consensus Service log"]
+            PAY2["PayoutAgent:<br/>pays from the risk pool"]
+        end
+    end
+
+    PA2 -->|"prompt injection"| MAL2
+    MAL2 -->|"unauthorized payment"| GUARD2
+    GUARD2 -->|"claim filed"| INV2
+    INV2 -->|"deviates from pattern"| PAY2
+    INV2 -->|"matches pattern"| DENY2["Claim denied"]
+
+    style ENS_SG2 fill:#eaf1ff,stroke:#4c82fb,stroke-width:2px
+    style WORLD_SG2 fill:#fff6e0,stroke:#e0a825,stroke-width:2px
+    style HEDERA_SG2 fill:#f1edff,stroke:#7c5cff,stroke-width:2px
+```
+
+Same three actors, now with the real agent names and the specific product per sponsor: **Hedera** shows up as two distinct services inside Fidelis's box (Consensus Service to *write* the log, Mirror Node to *read* it back); **ENS** is specifically the locked spending-scope mechanism, not a display name; **World** is specifically the live Selfie Check gating Guardian's claim. What v2 still collapses that v3 doesn't: InvestigatorAgent and PayoutAgent share one Hedera box instead of being split into their own agent-level boxes, and ENS only appears once (Northbeam's scope) instead of also gating Fidelis's investigation.
 
 #### v3 — full architecture (current build target)
 
