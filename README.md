@@ -63,19 +63,27 @@ Why it missed Hedera and ENS, confirmed against their exact published criteria:
 
 ## How
 
+### The scenario (for the submission story)
+
+Two real businesses, not one company checking its own homework. Naming them makes the stakeholder boundary concrete enough to actually narrate in the demo video:
+
+- **Northbeam Freight** — the insured. A logistics company whose accounts-payable runs on PayableAgent. Buys the policy, pays the premium, employs Guardian (their real, identified AP controller).
+- **Fidelis Agent Assurance** — the insurer. Sells the policy, holds the shared risk pool, and runs InvestigatorAgent + PayoutAgent on its own infrastructure — organizationally and economically separate from Northbeam, the same way a real insurer's claims adjuster doesn't work for the company being investigated.
+- **The attacker** — deliberately unnamed and unaffiliated with either company. That lack of any relationship is what makes the resulting loss a genuine insurable event rather than something either business staged (see "Why Guardian exists" below).
+
 ### Agent roles
 
-Four agents plus one human, jobs split apart deliberately (separation of duties — the agent that decides a claim is never the same one that moves money, so a compromised Investigator still can't pay itself out — and the claim itself can never be filed by software alone):
+Four agents plus one human, split across two companies (jobs also split apart *within* Fidelis deliberately — the agent that decides a claim is never the same one that moves money, so a compromised Investigator still can't pay itself out — and the claim itself can never be filed by software alone):
 
-| Actor | Side | Job |
+| Actor | Operated by | Job |
 |---|---|---|
-| **PayableAgent** | Insured (company) | Pays vendor invoices, sweeps idle cash into yield. The agent being insured. |
-| **MaliciousAgent** | Attacker | Crafts a prompt-injection payload disguised as a routine vendor invoice and delivers it into PayableAgent's workflow. Makes the attack an active adversarial agent in the demo, not a static poisoned file. |
-| **Guardian** | Insured (company) | The real, identified human accountable for PayableAgent. Must pass a live World Selfie Check to file a claim — no claim reaches InvestigatorAgent without one. Registered as PayableAgent's ENS guardian text record. |
-| **InvestigatorAgent** | Insurer | Pulls the disputed transaction's context from Hedera Mirror Node and ENS, reasons about whether it looks like manipulation, and signs a verdict. Does not move money. |
-| **PayoutAgent** | Insurer | Independently verifies the Investigator's signed verdict (real signature, active policy, sufficient pool funds) and is the only agent authorized to execute the actual payout on Hedera. |
+| **PayableAgent** | Northbeam Freight (the insured) | Pays vendor invoices, sweeps idle cash into yield. The agent being insured. |
+| **MaliciousAgent** | External attacker — no relationship to either company | Crafts a prompt-injection payload disguised as a routine vendor invoice and delivers it into PayableAgent's workflow. Makes the attack an active adversarial agent in the demo, not a static poisoned file. |
+| **Guardian** | Northbeam Freight (the insured) | The real, identified human accountable for PayableAgent — Northbeam's AP controller. Must pass a live World Selfie Check to file a claim — no claim reaches InvestigatorAgent without one. Registered as PayableAgent's ENS guardian text record. |
+| **InvestigatorAgent** | Fidelis Agent Assurance (the insurer) | Pulls the disputed transaction's context from Hedera Mirror Node and ENS, reasons about whether it looks like manipulation, and signs a verdict. Does not move money. |
+| **PayoutAgent** | Fidelis Agent Assurance (the insurer) | Independently verifies the Investigator's signed verdict (real signature, active policy, sufficient pool funds) and is the only agent authorized to execute the actual payout on Hedera. |
 
-This also hits Hedera's stated bonus criteria directly ("extra points for multi-agent A2A negotiation") rather than just being decoration.
+PayableAgent and Guardian run on Northbeam's side; InvestigatorAgent and PayoutAgent run on Fidelis's side — two companies, two wallets, two sets of incentives. That separation is what makes this insurance rather than self-certification, and it also hits Hedera's stated bonus criteria directly ("extra points for multi-agent A2A negotiation") rather than just being decoration.
 
 **Why Guardian exists:** without a human-verified claim step, the entire loss→claim cycle can be executed end to end by software alone — a company (or a rogue insider) could script PayableAgent into staging a fake "hack" that routes a payment to a self-controlled account, then auto-file the claim through the same automation. InvestigatorAgent's pattern check alone can't catch this, because a staged one-off deviation is indistinguishable from a real attack when the fraudster controls the entire transaction history being matched against. Requiring a live Selfie Check at claim-filing doesn't prove the claim is true, but it removes the zero-accountability, infinitely-scriptable version of the attack: every claim now costs a real, biometrically-identified human real legal exposure, and can't be looped by a script.
 
@@ -115,13 +123,13 @@ flowchart TD
 
 ### How it works
 
-1. Company registers PayableAgent for coverage, pays a premium into a shared risk pool. PayableAgent's declared spending scope (budget cap, approved vendor list) is written into its **ENS** text records and locked via a Permissioned Resolver — a functional, enforceable, tamper-resistant record, not a display name.
-2. MaliciousAgent crafts and delivers a prompt-injection payload disguised as a routine vendor invoice into PayableAgent's normal workflow.
+1. **Northbeam Freight** registers PayableAgent for coverage, pays a premium into Fidelis's shared risk pool. PayableAgent's declared spending scope (budget cap, approved vendor list) is written into its **ENS** text records and locked via a Permissioned Resolver — a functional, enforceable, tamper-resistant record, not a display name.
+2. The **external attacker** crafts and delivers a prompt-injection payload disguised as a routine vendor invoice into PayableAgent's normal workflow.
 3. PayableAgent processes it as it would any invoice, gets manipulated, and authorizes a payment outside its declared scope. Every transaction — this one included — is logged immutably via **Hedera Consensus Service**.
-4. Company notices the real vendor was never paid.
-5. Guardian (the real, identified human behind PayableAgent) files the claim — but filing requires passing a live **World Selfie Check** first. No human, no claim: this is what stops the same actor from scripting the "attack" and the claim together with nobody ever exposed.
-6. InvestigatorAgent pulls PayableAgent's full transaction history via **Hedera Mirror Node**, compares it against the locked ENS scope, reasons about whether the disputed payment looks like manipulation (sudden deviation from established pattern) vs. a legitimate decision, and signs a verdict — it cannot move funds itself.
-7. PayoutAgent verifies that signed verdict independently, then executes the approved payout on **Hedera** from the pool.
+4. Northbeam notices the real vendor was never paid.
+5. Guardian (Northbeam's real, identified AP controller, accountable for PayableAgent) files the claim with **Fidelis** — but filing requires passing a live **World Selfie Check** first. No human, no claim: this is what stops the same actor from scripting the "attack" and the claim together with nobody ever exposed.
+6. **Fidelis's** InvestigatorAgent pulls PayableAgent's full transaction history via **Hedera Mirror Node**, compares it against the locked ENS scope, reasons about whether the disputed payment looks like manipulation (sudden deviation from established pattern) vs. a legitimate decision, and signs a verdict — it cannot move funds itself.
+7. **Fidelis's** PayoutAgent verifies that signed verdict independently, then executes the approved payout on **Hedera** from the pool, back to Northbeam.
 
 ### Why it legitimately earns each sponsor's money (not just uses the tech)
 
@@ -205,7 +213,7 @@ Chosen because it maps directly onto the fidelity-bond analogy — this is liter
 
 ```mermaid
 flowchart TD
-    subgraph COMPANY["Company (Insured)"]
+    subgraph COMPANY["Northbeam Freight (Insured)"]
         REGISTER["Register PayableAgent + pay premium"]
 
         subgraph ENS_SCOPE["🔵 ENS"]
@@ -229,7 +237,7 @@ flowchart TD
 
     BLOCKED["Claim rejected —<br/>no human, no claim"]
 
-    subgraph ATTACKER["MaliciousAgent"]
+    subgraph ATTACKER["External Attacker (unaffiliated)"]
         CRAFT["Crafts fake invoice with hidden injected text"]
         SEND["Delivers it into PayableAgent's workflow"]
     end
@@ -238,7 +246,7 @@ flowchart TD
         LOG["Consensus Service:<br/>logs the compromised transaction"]
     end
 
-    subgraph INSURER["Insurance Protocol"]
+    subgraph INSURER["Fidelis Agent Assurance (Insurer)"]
         POOL[("Risk pool")]
         INTAKE["Receives the claim"]
 
@@ -284,7 +292,7 @@ flowchart TD
     style HEDERA_EXEC fill:#f1edff,stroke:#7c5cff,stroke-width:2px
 ```
 
-PayableAgent has paid this vendor 40 times, always to the same account. MaliciousAgent crafts the next invoice PDF with hidden white-on-white text — invisible to a human, but processed as data by PayableAgent while it extracts the payment details — instructing it to route this payment to a "new" account instead. PayableAgent can't structurally tell that injected text apart from a legitimate instruction, so it complies: same underlying scam (BEC) that already costs real businesses billions a year, but exploiting an AI-specific weakness rather than fooling a person. The transaction is logged immutably the instant it happens. The vendor eventually says they were never paid; Guardian — the real, ENS-registered human accountable for PayableAgent — goes to file a claim, and passes a live World Selfie Check to do it, so the claim carries a real identity, not just an agent's say-so. Only then does InvestigatorAgent pull the real payment history from Hedera Mirror Node — every prior payment went to account X, this one went to a brand-new account Y, first time ever, outside the ENS-declared vendor list — and sign a verdict that this is the signature of fraud, not a normal treasury decision. PayoutAgent independently verifies that signed verdict and pays the company back on Hedera.
+Northbeam Freight's PayableAgent has paid this vendor 40 times, always to the same account. The external attacker crafts the next invoice PDF with hidden white-on-white text — invisible to a human, but processed as data by PayableAgent while it extracts the payment details — instructing it to route this payment to a "new" account instead. PayableAgent can't structurally tell that injected text apart from a legitimate instruction, so it complies: same underlying scam (BEC) that already costs real businesses billions a year, but exploiting an AI-specific weakness rather than fooling a person. The transaction is logged immutably the instant it happens. The vendor eventually says they were never paid; Guardian — Northbeam's real, ENS-registered AP controller, accountable for PayableAgent — goes to file a claim with Fidelis Agent Assurance, and passes a live World Selfie Check to do it, so the claim carries a real identity, not just an agent's say-so. Only then does Fidelis's InvestigatorAgent pull the real payment history from Hedera Mirror Node — every prior payment went to account X, this one went to a brand-new account Y, first time ever, outside the ENS-declared vendor list — and sign a verdict that this is the signature of fraud, not a normal treasury decision. Fidelis's PayoutAgent independently verifies that signed verdict and pays Northbeam back on Hedera.
 
 ---
 
