@@ -129,7 +129,35 @@ flowchart TD
 2. **ENS** — the locked declared scope is the actual contract claims get judged against, and other agents (PayoutAgent included) verify identity and policy status through it before acting. Functional, not cosmetic — meets the literal bar ColdProof missed.
 3. **World** — Selfie Check gates the single highest-stakes action in the whole flow (claim-filing against a shared pool), as a real abuse-prevention signal that closes an actual attack (automated/staged claims fraud), not a login screen bolted on for coverage.
 
-### Architecture + worked example
+### Architecture — v1 → v3
+
+Same system, three passes of detail — from the one-breath pitch to the full build target. Use v1 for a quick explain, v3 as what actually gets built; update v2/v3 as the implementation changes shape during the hackathon rather than editing this doc from scratch each time.
+
+#### v1 — the pitch, one breath
+
+```mermaid
+flowchart LR
+    A["Agent pays vendors"] -->|"tricked by a hidden instruction"| B["Wrong payment sent"]
+    B --> C["Real human files a claim"]
+    C --> D{"Looks like fraud?"}
+    D -->|"yes"| E["Insurer pays the company back"]
+    D -->|"no"| F["Claim denied"]
+```
+
+#### v2 — the three sponsors show up
+
+```mermaid
+flowchart TD
+    PA["PayableAgent pays vendors"] -->|"prompt-injected invoice"| BAD["Unauthorized payment"]
+    BAD --> LOG["Hedera Consensus Service<br/>logs it immutably"]
+    LOG --> G["Guardian passes a live<br/>World Selfie Check"]
+    G --> CLAIM["Claim filed"]
+    CLAIM --> INV["InvestigatorAgent checks<br/>Hedera Mirror Node + locked ENS scope"]
+    INV -->|"deviates from pattern"| PAY["PayoutAgent pays from the pool"]
+    INV -->|"matches pattern"| DENY["Claim denied"]
+```
+
+#### v3 — full architecture (current build target)
 
 Chosen because it maps directly onto the fidelity-bond analogy — this is literally the accounts-payable/treasury-controller job fidelity bonds already cover for a human employee — while the actual exploit is AI-native, not generic phishing. The fraud *pattern* matches Business Email Compromise (BEC), the #1 real-world fidelity bond claim type, but the *mechanism* is indirect prompt injection: hidden text inside the vendor's invoice PDF that a human would never consciously see, but that PayableAgent processes as part of extracting the invoice's payment data.
 
