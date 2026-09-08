@@ -6,7 +6,9 @@
 
 **Why:** Everything Northbeam-side currently lives only as a prototype link, which cannot itself be the submitted product. The shell is the one piece every other Northbeam screen depends on, so it comes first and stays deliberately minimal — no screen content yet.
 
-**How:** Stand up the application with its navigation shell — sidebar, nav items, footer — matching the already-approved prototype and design spec exactly. The main content area is a bare placeholder; Overview and every other screen are separate, later pieces of work.
+**How:** Stand up the application with its navigation shell — sidebar, nav items, footer — and the Overview screen behind it, matching the already-approved prototype and design spec exactly, content included. Rules, Activity, and Claims remain separate, later pieces of work; only Overview lands with the shell.
+
+**Scope correction (2026-09-08):** This spec originally deferred Overview's content to a follow-up issue. That was a misreading of the human's intent — the actual ask was 1:1 parity with the published artifact, shell and Overview together. Action Item 6 below restores that scope; everything else in this spec is unchanged.
 
 **Zone 1 check:** Advances **Implementation** — a design already approved (published prototype + `DESIGN.northbeam.md`) is cheap to verify against here because the target output is fully specified in advance, not discovered during the work.
 
@@ -61,7 +63,13 @@ apps/northbeam/
 ├── src/components/ui/separator.tsx  # copied verbatim from tools/journey-tracker — zero review cost
 ├── src/components/ui/sheet.tsx      # copied verbatim from tools/journey-tracker (sidebar's mobile drawer) — zero review cost
 ├── src/components/ui/sidebar.tsx    # copied verbatim from tools/journey-tracker (real shadcn sidebar primitive) — zero review cost
-└── src/components/AppSidebar.tsx    # new — Northbeam nav (Overview/Rules/Activity/Claims, all inert) + Guardian footer
+├── src/components/AppSidebar.tsx    # new — Northbeam nav (Overview/Rules/Activity/Claims, all inert except Overview) + Guardian footer
+├── src/components/ui/card.tsx       # new — Card / CardHeader / CardContent primitives
+├── src/components/ui/badge.tsx      # new — Badge with neutral/success/warning/destructive/hedera/ens/world variants
+├── src/components/StatTile.tsx      # new — label/value/caption stat card
+├── src/components/DemoBar.tsx       # new — the top demo-guide strip (hint text, reset button), matching the published prototype exactly
+├── src/lib/seed-data.ts             # new — hardcoded rules/activity/claims matching the published prototype's seed state
+└── src/pages/Overview.tsx           # new — banner, 4 stat tiles, pipeline timeline, recent-activity table; all values read directly off seed-data.ts inline, no separate logic layer
 ```
 
 ---
@@ -117,3 +125,13 @@ Verify:
 cd apps/northbeam && npm run build
 ```
 → exits 0
+
+**[x] Build the Overview screen at 1:1 parity with the published prototype**
+
+Implement: `src/components/ui/card.tsx`, `src/components/ui/badge.tsx`, `src/components/StatTile.tsx`, `src/components/DemoBar.tsx`, `src/lib/seed-data.ts`, and `src/pages/Overview.tsx` — reproducing the published artifact's Overview screen exactly: the top demo-guide bar (hint text + reset), the ENS-published banner with the ENS name and a Copy action, four stat tiles (Coverage limit $5,000, Policy status Pending, Claims filed 1, Claims paid 1), the "How this policy exists" pipeline (Underwriting / Certificate / Claims + vault), and the Recent activity table (the two seeded Acme Corp payments). Wire `App.tsx` to render `Overview` in the main content area instead of the placeholder.
+
+Verify:
+```
+cd apps/northbeam && npm run build
+```
+→ exits 0, and the rendered page matches the published prototype's Overview screen content and layout
