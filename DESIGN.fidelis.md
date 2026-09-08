@@ -1,17 +1,17 @@
 ---
 version: alpha
 name: Fidelis Portal
-description: Fidelis's interface is an actual insurer's claims desk — institutional and a shade more formal than Northbeam's, because it's the counterparty whose judgment the payout depends on. Same inherited system as Northbeam (Airbnb's full rounding and soft low-opacity elevation, Plus Jakarta Sans, JetBrains Mono for ledger data) recolored around a deep garnet accent — a deliberate nod to legacy-insurer gravitas (navy-plus-deep-red premium pairing, à la Chubb) without reusing navy itself, which would blend into the ENS sponsor tag every Fidelis screen shows beside it.
+description: Fidelis's interface is an actual insurer's claims desk — institutional and a shade more formal than Northbeam's, because it's the counterparty whose judgment the payout depends on. Same inherited system as Northbeam (Airbnb's full rounding and soft low-opacity elevation, Plus Jakarta Sans, JetBrains Mono for ledger data) recolored around a deep plum accent — legacy-insurer gravitas without reading as an alert color, and distinct enough from navy that it won't blend into the ENS sponsor tag every Fidelis screen shows beside it.
 colors:
-  primary: "#8B3A46"
-  primary-strong: "#6E2D37"
+  primary: "#5B3A78"
+  primary-strong: "#452C5E"
   ink: "#171A1F"
   body: "#5A6270"
   muted-light: "#9AA2AD"
   disabled: "#C7CCD3"
   surface: "#FFFFFF"
-  surface-muted: "#F6F1F2"
-  hairline: "#D8DEE6"
+  surface-muted: "#F3F1F6"
+  hairline: "#DCD5E3"
   success: "#1E8F55"
   warning: "#D6900B"
   destructive: "#D22B2B"
@@ -23,13 +23,13 @@ colors:
   world: "#E0A825"
   world-fill: "#FFF6E0"
 colors-dark:
-  primary: "#C96B78"
-  on-primary: "#20090C"
+  primary: "#B79BD6"
+  on-primary: "#1E1428"
   ink: "#F5F6F7"
   body: "#9AA3B0"
   surface: "#161A20"
-  surface-muted: "#1D232B"
-  hairline: "#2A2D33"
+  surface-muted: "#241D2E"
+  hairline: "#332A40"
 typography:
   display-lg:
     fontFamily: Plus Jakarta Sans
