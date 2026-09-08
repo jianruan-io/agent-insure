@@ -2,6 +2,11 @@
 node_modules/
 dist/
 
+# Secrets — .env.example stays tracked, everything else doesn't
+.env
+.env.local
+.env.*.local
+
 # Ideation brainstorm scratchpad
 tools/journey-tracker/
 
