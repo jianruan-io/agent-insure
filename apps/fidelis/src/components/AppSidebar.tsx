@@ -1,4 +1,5 @@
 import { Inbox, LayoutGrid, Shield } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Sidebar,
   SidebarContent,
@@ -9,17 +10,28 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from './ui/sidebar';
+import type { Claim } from '../lib/claims/types';
 
-const NAV_ITEMS = [
-  { label: 'Overview', icon: LayoutGrid },
-  { label: 'Claims Queue', icon: Inbox, badge: 2 },
-];
+function money(amount: number): string {
+  return `$${amount.toLocaleString()}`;
+}
+
+interface AppSidebarProps {
+  claims: Claim[];
+  poolBalance: number;
+}
 
 /**
- * Fidelis Portal's permanent navigation shell. Nav items are inert until each
- * screen lands as its own piece of work — see spec TECH-623.
+ * Fidelis Portal's permanent navigation shell. See spec TECH-623.
  */
-export function AppSidebar() {
+export function AppSidebar({ claims, poolBalance }: AppSidebarProps) {
+  const location = useLocation();
+
+  const navItems = [
+    { label: 'Overview', to: '/overview', icon: LayoutGrid },
+    { label: 'Claims Queue', to: '/claims', icon: Inbox, badge: claims.length },
+  ];
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -39,16 +51,18 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarMenu>
-            {NAV_ITEMS.map((item) => (
+            {navItems.map((item) => (
               <SidebarMenuItem key={item.label}>
-                <SidebarMenuButton>
-                  <item.icon />
-                  <span className="flex flex-1 items-center justify-between gap-2">
-                    <span className="truncate">{item.label}</span>
-                    {item.badge != null && (
-                      <span className="text-xs tabular-nums text-sidebar-foreground/45">{item.badge}</span>
-                    )}
-                  </span>
+                <SidebarMenuButton asChild isActive={location.pathname === item.to}>
+                  <Link to={item.to}>
+                    <item.icon />
+                    <span className="flex flex-1 items-center justify-between gap-2">
+                      <span className="truncate">{item.label}</span>
+                      {item.badge != null && (
+                        <span className="text-xs tabular-nums text-sidebar-foreground/45">{item.badge}</span>
+                      )}
+                    </span>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
@@ -61,7 +75,7 @@ export function AppSidebar() {
           <div className="text-[10px] font-semibold uppercase tracking-wide text-sidebar-foreground/55">
             Reserve pool
           </div>
-          <div className="text-sm font-bold tabular-nums">$48,800</div>
+          <div className="text-sm font-bold tabular-nums">{money(poolBalance)}</div>
         </div>
       </SidebarFooter>
     </Sidebar>
