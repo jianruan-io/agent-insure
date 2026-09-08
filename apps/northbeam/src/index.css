@@ -143,3 +143,47 @@
     @apply bg-background text-foreground font-sans;
   }
 }
+
+/* SelfieModal's face-scan viewfinder (src/components/SelfieModal.tsx) — a dashed-circle
+   frame with a scanning line, matching the published prototype's `.viewfinder`/`.scan-line`
+   pixel-for-pixel. Not expressible with existing utility classes/tokens alone (a running
+   CSS animation), so it lives here rather than inline styles. */
+.selfie-viewfinder {
+  position: relative;
+  width: 130px;
+  height: 130px;
+  margin: 14px auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 9999px;
+  border: 2px dashed var(--border);
+  background: var(--muted);
+  font-size: 34px;
+}
+.selfie-scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary);
+  animation: selfie-scan 1.3s linear infinite;
+}
+@keyframes selfie-scan {
+  0% {
+    top: 6%;
+  }
+  50% {
+    top: 90%;
+  }
+  100% {
+    top: 6%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .selfie-scan-line {
+    animation: none;
+    top: 50%;
+  }
+}
