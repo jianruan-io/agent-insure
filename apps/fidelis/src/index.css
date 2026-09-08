@@ -13,10 +13,10 @@
     --popover: #FFFFFF;
     --popover-foreground: #171A1F;
 
-    --primary: #8B3A46;
+    --primary: #5B3A78;
     --primary-foreground: #FFFFFF;
 
-    --secondary: #F6F1F2;
+    --secondary: #F3F1F6;
     --secondary-foreground: #171A1F;
 
     --success: #1E8F55;
@@ -26,14 +26,14 @@
     --destructive: #D22B2B;
     --destructive-foreground: #FFFFFF;
 
-    --muted: #F6F1F2;
+    --muted: #F3F1F6;
     --muted-foreground: #5A6270;
-    --accent: #F6F1F2;
+    --accent: #F3F1F6;
     --accent-foreground: #171A1F;
 
-    --border: #D8DEE6;
-    --input: #D8DEE6;
-    --ring: #8B3A46;
+    --border: #DCD5E3;
+    --input: #DCD5E3;
+    --ring: #5B3A78;
 
     --radius: 0.5rem;
   }
@@ -46,43 +46,43 @@
     --popover: #1D232B;
     --popover-foreground: #F5F6F7;
 
-    --primary: #C96B78;
-    --primary-foreground: #20090C;
+    --primary: #B79BD6;
+    --primary-foreground: #1E1428;
 
-    --secondary: #1D232B;
+    --secondary: #241D2E;
     --secondary-foreground: #F5F6F7;
 
-    --muted: #1D232B;
+    --muted: #241D2E;
     --muted-foreground: #9AA3B0;
-    --accent: #1D232B;
+    --accent: #241D2E;
     --accent-foreground: #F5F6F7;
 
-    --border: #2A2D33;
-    --input: #2A2D33;
-    --ring: #C96B78;
+    --border: #332A40;
+    --input: #332A40;
+    --ring: #B79BD6;
   }
 }
 
 :root {
-  --sidebar: #F9F5F5;
-  --sidebar-foreground: #4A5061;
-  --sidebar-primary: #8B3A46;
+  --sidebar: #F8F6FA;
+  --sidebar-foreground: #4A4657;
+  --sidebar-primary: #5B3A78;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #EFE5E7;
+  --sidebar-accent: #EDE7F2;
   --sidebar-accent-foreground: #171A1F;
-  --sidebar-border: #E3D5D7;
-  --sidebar-ring: #8B3A46;
+  --sidebar-border: #DED3E7;
+  --sidebar-ring: #5B3A78;
 }
 
 .dark {
-  --sidebar: #17161B;
-  --sidebar-foreground: #D6D9E0;
-  --sidebar-primary: #C96B78;
-  --sidebar-primary-foreground: #20090C;
-  --sidebar-accent: #1D232B;
+  --sidebar: #18141F;
+  --sidebar-foreground: #D9D3E0;
+  --sidebar-primary: #B79BD6;
+  --sidebar-primary-foreground: #1E1428;
+  --sidebar-accent: #241D2E;
   --sidebar-accent-foreground: #F5F6F7;
-  --sidebar-border: #2A2D33;
-  --sidebar-ring: #C96B78;
+  --sidebar-border: #332A40;
+  --sidebar-ring: #B79BD6;
 }
 
 @theme inline {

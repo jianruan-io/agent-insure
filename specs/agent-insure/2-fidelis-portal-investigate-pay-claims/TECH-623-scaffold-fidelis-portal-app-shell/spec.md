@@ -125,3 +125,9 @@ Verify:
 cd apps/fidelis && npx tsc --noEmit && npm run build
 ```
 → both exit 0
+
+---
+
+## Revision — primary accent color
+
+During Phase 3 review, the human asked for the primary accent to move off the original deep-garnet red — it read as an alert/warning color rather than an institutional brand color. `DESIGN.fidelis.md` and `apps/fidelis/src/index.css` were both updated to a deep plum (`#5B3A78` light / `#B79BD6` dark) in place of garnet (`#8B3A46` light / `#C96B78` dark); everything else about the design system (Airbnb-style rounding, Plus Jakarta Sans/JetBrains Mono, sponsor-tag colors) is unchanged.
