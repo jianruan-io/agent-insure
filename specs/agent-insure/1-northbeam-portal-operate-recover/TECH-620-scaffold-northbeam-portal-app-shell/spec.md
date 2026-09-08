@@ -135,3 +135,15 @@ Verify:
 cd apps/northbeam && npm run build
 ```
 → exits 0, and the rendered page matches the published prototype's Overview screen content and layout
+
+**[x] Wire real routing and build Rules, Activity, and Claims at full parity**
+
+**Scope correction (2026-09-08, second):** Every nav item must actually navigate and every screen must be as interactive as the published prototype — not just Overview. This adds `react-router-dom`, removes the earlier "nav items are inert" business rule, and builds the three remaining screens with their real local-state interactivity: **Rules** (budget cap + vendor list display, "Lock Rules On-Chain" button that flips `rules.locked` and unlocks the rest of the demo), **Activity** (feed table, "Simulate normal invoice" and "Simulate poisoned invoice" buttons that append rows, disabled until rules are locked), **Claims** (claim cards, "+ File a Claim" enabled only when a flagged-and-unclaimed activity row exists, a Selfie Check modal that simulates a face scan and marks the claim submitted). State is shared across all four routes via a single top-level store (matching the published prototype's seed data), persisted to `localStorage` the same way the prototype does, so locking rules on `/rules` actually unlocks the attack button on `/activity`, etc.
+
+Implement: `src/lib/store.ts` (shared state + actions via React context + `useReducer`, replacing the static `seed-data.ts` import), `src/pages/Rules.tsx`, `src/pages/Activity.tsx`, `src/pages/Claims.tsx`, `src/components/SelfieModal.tsx`, updated `src/App.tsx` (real `react-router-dom` routes for `/`, `/rules`, `/activity`, `/claims`), updated `src/components/AppSidebar.tsx` (nav items become real `<Link>`s with active-route highlighting), updated `src/pages/Overview.tsx` and `src/components/DemoBar.tsx` to read from the shared store.
+
+Verify:
+```
+cd apps/northbeam && npm run build && npx tsc --noEmit
+```
+→ both exit 0, and clicking each of the four sidebar nav items in the running app navigates to a distinct, populated screen
