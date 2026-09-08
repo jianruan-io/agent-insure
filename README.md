@@ -59,6 +59,17 @@ Why it missed Hedera and ENS, confirmed against their exact published criteria:
 - Closest real-world analog: **fidelity bond / commercial crime insurance** — companies already buy this to cover employee theft/fraud. An AI agent with a wallet is the same risk category as an employee with a company card. Not a manufactured need — an existing purchasing habit, extended to a new class of economic actor.
 - Why an owner pays the premium: (1) tail-risk transfer — rare but catastrophic loss beats unpredictable ruin, (2) lets them grant the agent a bigger real budget instead of neutering it with tiny caps out of fear, (3) cheaper than building an internal fraud-review team themselves.
 
+### Why microinsurance, why now
+
+A human buys insurance once a year because a human transacts at human speed. An autonomous agent making thousands of payments a day breaks that model — a fixed annual premium prices the wrong unit of risk. Charging a small, metered coverage fee per transaction instead (pay-as-you-go coverage for pay-as-you-go economic activity) isn't a novelty for this pitch — it mirrors real, already-established usage-based insurance (pay-per-mile auto, pay-per-shipment cargo), and it's the direction the emerging AI-agent-insurance market (Klaimee, Armilla Assurance, cyber insurers like Beazley and QBE rewriting policy language for autonomous losses) is already moving.
+
+It also makes economic sense specifically *because* the insured party is a machine, not a human:
+
+- **Auditable risk, not guessed risk.** Human underwriting is plagued by information the insurer can't see — is the employee tired, distracted, careless. An AI agent's spending scope is code: PayableAgent's budget cap and approved-vendor list are declared and locked on ENS, inspectable before a policy is even priced. This is the literal difference between guessing and underwriting.
+- **Cryptographic proof instead of a weeks-long investigation.** A human fraud claim takes an adjuster days or weeks to verify. Here, every payment is already permanently recorded on-chain the instant it happens — InvestigatorAgent's verdict is checked against a record neither party can quietly alter, not against conflicting witness statements.
+
+One guardrail this implies: the coverage-fee amount charged per transaction must be a fixed, protocol-enforced value — never something the paying agent's own LLM call is allowed to decide. The model that got fooled by the invoice is not the model that should also be setting its own insurance premium.
+
 ---
 
 ## How
@@ -311,6 +322,50 @@ Northbeam Distributors' PayableAgent has paid this vendor 40 times, always to th
 | **Identity & Policy** | ENS (ENSv2, Permissioned Resolver) | PayableAgent's declared spending scope (budget cap, approved vendor list) is written into its ENS text records and locked — the enforceable contract claims are judged against; also where Guardian is registered as PayableAgent's guardian |
 | **Claim Verification** | World ID / Selfie Check | Gates claim-filing behind a live, biometric human check so the entire loss→claim cycle can't be scripted end to end without a real accountable person |
 | **Agents** | PayableAgent, MaliciousAgent, Guardian, InvestigatorAgent, PayoutAgent | Four agents + one human, separation of duties: the agent that judges a claim never moves money, and a claim can never be filed by software alone |
+
+---
+
+## Milestones
+
+Where the build actually stands, not just what's designed. `UI` = clickable with hardcoded data in the console prototypes; `real` = wired to the actual chain/SDK. As of Sept 7, 2026 (6 days to submission) everything below is UI-only — no real backend/logic has been wired yet, by design (UI first, backend second).
+
+```
+Agent Insure
+├── 0. Foundation & Access                         ⚠ blocking — nothing below goes UI → real without this
+│   ├── Hedera testnet account provisioned
+│   ├── Sepolia RPC key + testnet ETH (separate chain from Hedera — easy to forget)
+│   ├── World Selfie Check feature flag requested   ← the one dependency outside our control, unknown lead time
+│   └── ENS lookups pointed at the hackathon's dedicated Sepolia deployment (not the public ENS beta)
+│
+├── 1. Northbeam Portal — "Operate & Recover" (the insured)
+│   ├── 1.1 Provision & Operate
+│   │   ├── Set Up Spending Rules For AI Agents      [UI ✔ · ENS write ☐]
+│   │   └── Agent Pays Vendors                       [UI ✔ · Hedera x402 + HCS ☐]
+│   ├── 1.2 Attack & Detection
+│   │   └── Bad Payment Happens                      [UI ✔ · real prompt-injected agent ☐]
+│   └── 1.3 Claim & Payout
+│       ├── Notice + File                            [UI ✔]
+│       ├── Prove Identity                           [UI ✔ mocked scan · real World SDK ☐]
+│       └── Receive Payout                           [UI ✔ · real Hedera payout ☐]
+│
+├── 2. Fidelis Portal — "Investigate & Pay Claims" (the insurer)
+│   ├── 2.1 Investigate                              [UI ✔ · real Mirror Node + verdict logic ☐]
+│   └── 2.2 Payout                                   [UI ✔ · real payout execution ☐]
+│
+├── 3. Judging Compliance Deliverables               ← paperwork, not product
+│   ├── Hedera: one real end-to-end x402-gated paid request via Blocky402
+│   ├── ENS: fix "Permissioned Resolver" → Enhanced Access Control, demo a real on-chain record
+│   └── World: required feedback doc (SelfieCheck docs / Sandbox edge cases) — graded, not optional
+│
+└── 4. Submission Package
+    ├── README finalized (architecture diagrams done — fold in sponsor-proof sections)
+    ├── Demo video (walks the exact story the UI prototypes already tell)
+    └── Repo cleanup (journey-tracker stays internal, not part of graded scope)
+```
+
+Not a milestone, but a standing decision: the AI-router idea (see "Rejected / explored ideas" below — kept as a live fallback, not rejected outright) gets picked up only if a concrete trigger date passes without branch 1–2 UI being solid. That trigger date isn't set yet.
+
+Design direction for branches 1–2's UI is specified in `references/design.md` — two separate apps (Northbeam, Fidelis), one shared design system, distinct accent colors per company.
 
 ---
 
