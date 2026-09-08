@@ -1,0 +1,189 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@layer base {
+  :root {
+    /* Northbeam Portal — light theme (DESIGN.northbeam.md `colors`) */
+    --background: #FFFFFF;
+    --foreground: #171A1F;
+    --card: #FFFFFF;
+    --card-foreground: #171A1F;
+    --popover: #FFFFFF;
+    --popover-foreground: #171A1F;
+
+    --primary: #1F6F5C;
+    --primary-strong: #17564A;
+    --primary-foreground: #FFFFFF;
+
+    --secondary: #F1F3F6;
+    --secondary-foreground: #171A1F;
+
+    --success: #1E8F55;
+    --success-foreground: #FFFFFF;
+    --warning: #D6900B;
+    --warning-foreground: #FFFFFF;
+    --destructive: #D22B2B;
+    --destructive-foreground: #FFFFFF;
+
+    --muted: #F1F3F6;
+    --muted-foreground: #5A6270;
+    --accent: #F1F3F6;
+    --accent-foreground: #171A1F;
+
+    --border: #D8DEE6;
+    --input: #D8DEE6;
+    --ring: #1F6F5C;
+
+    --radius: 0.5rem;
+
+    /* Sponsor tags — fixed across Northbeam and Fidelis, never recolored to the app accent */
+    --hedera: #7C5CFF;
+    --hedera-fill: #F1EDFF;
+    --ens: #4C82FB;
+    --ens-fill: #EAF1FF;
+    --world: #E0A825;
+    --world-fill: #FFF6E0;
+
+    /* Sidebar */
+    --sidebar: #F9FAFB;
+    --sidebar-foreground: #5A6270;
+    --sidebar-primary: #1F6F5C;
+    --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-accent: #F1F3F6;
+    --sidebar-accent-foreground: #171A1F;
+    --sidebar-border: #D8DEE6;
+    --sidebar-ring: #1F6F5C;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Northbeam Portal — dark theme (DESIGN.northbeam.md `colors-dark`) — this is
+       operational software with no fixed hours, so dark mode follows the OS setting
+       automatically rather than staying light-only. */
+    --background: #161A20;
+    --foreground: #F5F6F7;
+    --card: #1D232B;
+    --card-foreground: #F5F6F7;
+    --popover: #1D232B;
+    --popover-foreground: #F5F6F7;
+
+    --primary: #2FA68A;
+    --primary-strong: #2FA68A;
+    --primary-foreground: #08201F;
+
+    --secondary: #1D232B;
+    --secondary-foreground: #F5F6F7;
+
+    --muted: #1D232B;
+    --muted-foreground: #9AA3B0;
+    --accent: #1D232B;
+    --accent-foreground: #F5F6F7;
+
+    --border: #2A2D33;
+    --input: #2A2D33;
+    --ring: #2FA68A;
+
+    --sidebar: #1D232B;
+    --sidebar-foreground: #9AA3B0;
+    --sidebar-primary: #2FA68A;
+    --sidebar-primary-foreground: #08201F;
+    --sidebar-accent: #2A2D33;
+    --sidebar-accent-foreground: #F5F6F7;
+    --sidebar-border: #2A2D33;
+    --sidebar-ring: #2FA68A;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Plus Jakarta Sans for all UI text; JetBrains Mono reserved for addresses, ENS
+     names, and transaction hashes (DESIGN.northbeam.md typography block). */
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+}
+
+/* SelfieModal's face-scan viewfinder (src/components/SelfieModal.tsx) — a dashed-circle
+   frame with a scanning line, matching the published prototype's `.viewfinder`/`.scan-line`
+   pixel-for-pixel. Not expressible with existing utility classes/tokens alone (a running
+   CSS animation), so it lives here rather than inline styles. */
+.selfie-viewfinder {
+  position: relative;
+  width: 130px;
+  height: 130px;
+  margin: 14px auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 9999px;
+  border: 2px dashed var(--border);
+  background: var(--muted);
+  font-size: 34px;
+}
+.selfie-scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary);
+  animation: selfie-scan 1.3s linear infinite;
+}
+@keyframes selfie-scan {
+  0% {
+    top: 6%;
+  }
+  50% {
+    top: 90%;
+  }
+  100% {
+    top: 6%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .selfie-scan-line {
+    animation: none;
+    top: 50%;
+  }
+}
