@@ -1,9 +1,10 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { StatTile } from '../components/StatTile';
-import { activity, claims, rules } from '../lib/seed-data';
+import { useStore } from '../lib/store.js';
 
 const ENS_NAME = 'payableagent.northbeam.eth';
 
@@ -116,10 +117,13 @@ function PipelineStep({ tone, icon, title, description, isLast = false }: Pipeli
  * before deciding whether to trust it. Reproduces the published prototype's
  * `screenOverview()` at 1:1 content/structure parity: the ENS-published banner, the four
  * coverage/policy/claims stat tiles, the three-step "how this policy exists" pipeline,
- * and the recent-activity table. All values read directly off seed-data.ts — there's no
- * separate logic layer, matching the file tree's intent for this issue.
+ * and the recent-activity table. Values now come from the shared store (`useStore`)
+ * instead of the old static seed-data.ts import, so locking rules on `/rules` or
+ * simulating an invoice on `/activity` is reflected here immediately.
  */
 export function Overview() {
+  const { state } = useStore();
+  const { rules, activity, claims } = state;
   const [copyLabel, setCopyLabel] = useState('Copy');
 
   function handleCopyEns() {
@@ -200,9 +204,8 @@ export function Overview() {
       <Card>
         <CardHeader>
           <h3 className="text-sm font-bold">Recent activity</h3>
-          {/* Activity doesn't exist as a real screen yet — this link is inert until it does. */}
-          <Button variant="ghost" size="sm">
-            View all →
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/activity">View all →</Link>
           </Button>
         </CardHeader>
         <CardContent className="overflow-x-auto px-2 pb-2 pt-0">

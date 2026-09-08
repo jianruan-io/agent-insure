@@ -1,3 +1,4 @@
+import { Link, useLocation } from 'react-router-dom';
 import {
   Sidebar,
   SidebarContent,
@@ -72,14 +73,13 @@ function BuildingIcon() {
   );
 }
 
-/** The four primary screens. Every item renders so the sidebar looks complete, but none
- *  are wired to a real route yet — this issue ships the navigation shell only (see the
- *  spec's Core Logic / business rules: "No nav item goes anywhere yet"). */
+/** The four primary screens, each a real route now that Rules, Activity, and Claims
+ *  exist behind their own paths. */
 const NAV_ITEMS = [
-  { id: 'overview', label: 'Overview', icon: GridIcon },
-  { id: 'rules', label: 'Rules', icon: ListIcon },
-  { id: 'activity', label: 'Activity', icon: ActivityIcon },
-  { id: 'claims', label: 'Claims', icon: FileIcon },
+  { path: '/', label: 'Overview', icon: GridIcon },
+  { path: '/rules', label: 'Rules', icon: ListIcon },
+  { path: '/activity', label: 'Activity', icon: ActivityIcon },
+  { path: '/claims', label: 'Claims', icon: FileIcon },
 ] as const;
 
 /**
@@ -87,9 +87,12 @@ const NAV_ITEMS = [
  * signed-in Guardian's footer identity. Built on the shared shadcn Sidebar primitive —
  * `collapsible="icon"` gives desktop-only icon-rail collapsing, while the primitive's own
  * mobile behavior (a full slide-in Sheet, never a collapsed rail) covers the phone-sized
- * case for free.
+ * case for free. Nav items are real `react-router-dom` `Link`s (via `SidebarMenuButton`'s
+ * `asChild`), with the active route highlighted from `useLocation()`.
  */
 export function AppSidebar() {
+  const location = useLocation();
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -112,10 +115,12 @@ export function AppSidebar() {
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
               return (
-                <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton isActive={item.id === 'overview'}>
-                    <Icon />
-                    <span>{item.label}</span>
+                <SidebarMenuItem key={item.path}>
+                  <SidebarMenuButton asChild isActive={location.pathname === item.path}>
+                    <Link to={item.path}>
+                      <Icon />
+                      <span>{item.label}</span>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               );
