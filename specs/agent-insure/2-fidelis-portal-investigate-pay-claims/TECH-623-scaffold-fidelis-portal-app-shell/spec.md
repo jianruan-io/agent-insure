@@ -3,16 +3,16 @@
 ## Overview
 
 **What:**
-Fidelis Agent Assurance gets the permanent navigation shell of its own real application — the sidebar and layout every future screen will sit inside — instead of a shareable prototype link.
+Fidelis Agent Assurance gets its own real, running application with both of its working screens reachable by URL — Overview (pool health and how a claim gets paid) and Claims Queue (investigate and pay a disputed claim) — not just a navigation frame.
 
 **Why:**
-Everything Fidelis-side currently lives only as a prototype link, which cannot itself be the submitted product. The shell is the one piece every other Fidelis screen depends on, so it comes first and stays deliberately minimal — no screen content yet.
+A shell with no screens behind it can't demonstrate the actual claims workflow, and everything Fidelis-side still only exists as a shareable prototype link, which can't itself be the submitted product. Matching the approved prototype's full behavior — not just its layout — is what makes this a real product instead of a static frame.
 
 **How:**
-Stand up the application with its navigation shell — sidebar, nav items, footer — matching the already-approved prototype and design spec exactly. The main content area is a bare placeholder; Overview and Claims Queue are separate, later pieces of work.
+Give Overview and Claims Queue their own routes so each is a real, directly-loadable screen, and port the prototype's claim data and its two actions — investigate a claim, then pay it — into the running app. The outcome of each action matches the approved prototype exactly (a verdict appears, a payout debits the pool); the prototype's cosmetic step-by-step reveal timing is dropped since it doesn't change what's being verified.
 
 **Zone 1 check:**
-Advances **Implementation** — a design already approved (published prototype + `DESIGN.fidelis.md`) is cheap to verify against here because the target output is fully specified in advance, not discovered during the work.
+Advances **Implementation** — a design already approved (published prototype + `DESIGN.fidelis.md`) is cheap to verify against here because the target output — both screens' layout and the claim lifecycle they drive — is fully specified in advance, not discovered during the work.
 
 ---
 
@@ -20,32 +20,36 @@ Advances **Implementation** — a design already approved (published prototype +
 
 ```mermaid
 flowchart TD
-    LOAD["Someone opens the app"] --> SCREENSIZE{"How wide is their screen?"}
-    SCREENSIZE -->|"Phone-sized"| HIDDEN["Sidebar starts tucked<br/>away off-screen"]
-    SCREENSIZE -->|"Normal desktop"| SHOWN["Sidebar starts open<br/>on the left"]
+    NAV["Click Overview or Claims Queue<br/>in the sidebar"] --> ROUTE{"Which route?"}
+    DIRECTURL["Someone opens /overview or /claims<br/>directly in the browser"] --> ROUTE
 
-    HIDDEN --> MENUTAP["They tap the menu button"]
-    MENUTAP --> SLIDEIN["Sidebar slides in<br/>over the page"]
-    SLIDEIN --> TAPOUT["They tap outside it,<br/>or tap it again"]
-    TAPOUT --> HIDDEN
+    ROUTE -->|"/overview"| OV["Overview renders:<br/>stat tiles, payout pipeline,<br/>recent payouts table"]
+    ROUTE -->|"/claims"| CQ["Claims Queue renders:<br/>claim list + selected claim's detail"]
 
-    SHOWN --> COLLAPSE["They click the<br/>collapse arrow"]
-    COLLAPSE --> ICONSONLY["Sidebar shrinks<br/>to just icons"]
-    ICONSONLY --> EXPAND["They click it again"]
-    EXPAND --> SHOWN
+    OV --> ACTIVE1["Overview nav item<br/>shows active"]
+    CQ --> ACTIVE2["Claims Queue nav item<br/>shows active"]
+```
 
-    SHOWN --> CLICKANY["They click any nav item<br/>(Overview, Claims Queue)"]
-    CLICKANY --> INERT["Nothing happens yet —<br/>no screen exists behind<br/>either of them in this piece of work"]
+```mermaid
+stateDiagram-v2
+    [*] --> Submitted: claim filed
+    Submitted --> Investigated: Run Investigation clicked
+    Investigated --> Paid: Run Payout clicked
+    Paid --> [*]
+
+    Submitted --> Submitted: Run Investigation clicked again (no-op, already queued)
+    Investigated --> Investigated: Run Investigation clicked again (no-op, already investigated)
+    Paid --> Paid: Run Payout clicked again (no-op, already paid)
 ```
 
 ### Business rules
 
-- On a phone-sized screen the sidebar always starts hidden; on a normal-sized screen it always starts open. This depends only on how wide the screen is, not on anything the person did last time.
-- Collapsing to icons-only is a desktop-only move — on a phone the sidebar is all-or-nothing (a slide-in panel), never a collapsed icon rail.
-- No nav item goes anywhere yet — this issue is the shell only. Both items render so the sidebar looks complete, but neither is wired to a real screen.
-- The footer shows the reserve pool balance as static display text — no live data source exists yet in this piece of work.
-
-This is pure UI — a navigation shell with no data, no branching, and nothing worth testing. Verification is visual parity against the published prototype plus a clean build.
+- Visiting `/overview` or `/claims` directly renders that screen — these are real routes, not just internal tab state.
+- The sidebar highlights whichever nav item matches the current route.
+- A claim can only be investigated once; running it again on an already-investigated claim changes nothing.
+- Run Payout is unavailable until a claim is investigated, and running it again on an already-paid claim changes nothing.
+- Paying a claim deducts its amount from the pool balance exactly once, at the moment of payout.
+- The sidebar's Claims Queue badge, the sidebar footer's pool balance, and Overview's stat tiles are always derived from current claims/pool state — never a separately-stored copy.
 
 ---
 
@@ -53,64 +57,28 @@ This is pure UI — a navigation shell with no data, no branching, and nothing w
 
 ```
 apps/fidelis/
-├── package.json                     # new — Vite + React 19 + TS + Tailwind v4, mirrors tools/journey-tracker's dependency set
-├── vite.config.ts                   # new — mirrors tools/journey-tracker's Vite + Tailwind plugin config
-├── tsconfig.json                    # new — mirrors tools/journey-tracker's TS config
-├── index.html                       # new — Vite entry; loads Plus Jakarta Sans + JetBrains Mono
-├── src/main.tsx                     # new — React root mount
-├── src/App.tsx                      # new — renders AppSidebar + a bare placeholder main area
-├── src/index.css                    # new — Tailwind v4 theme block, recolored from tools/journey-tracker's per DESIGN.fidelis.md
-├── src/lib/utils.ts                 # copied verbatim from tools/journey-tracker (cn helper) — zero review cost
-├── src/hooks/useIsMobile.ts         # copied verbatim from tools/journey-tracker — zero review cost
-├── src/components/ui/button.tsx     # copied verbatim from tools/journey-tracker — zero review cost
-├── src/components/ui/separator.tsx  # copied verbatim from tools/journey-tracker — zero review cost
-├── src/components/ui/sheet.tsx      # copied verbatim from tools/journey-tracker (sidebar's mobile drawer) — zero review cost
-├── src/components/ui/sidebar.tsx    # copied verbatim from tools/journey-tracker (real shadcn sidebar primitive) — zero review cost
-├── src/components/ui/input.tsx      # copied verbatim from tools/journey-tracker — sidebar.tsx's hard dependency (SidebarInput), not portable without it
-├── src/components/ui/skeleton.tsx   # copied verbatim from tools/journey-tracker — sidebar.tsx's hard dependency (SidebarMenuSkeleton), not portable without it
-└── src/components/AppSidebar.tsx    # new — Fidelis nav (Overview/Claims Queue, all inert) + Reserve pool footer
+├── package.json                          # modify — add react-router-dom (routing) and vitest (unit tests); vitest runs on its defaults, no vite.config.ts change needed
+├── src/index.css                         # modify — add success/warning color tokens to @theme (needed for status badges on Claims Queue and the recent-payouts table)
+├── src/lib/claims/types.ts               # new — Claim type
+├── src/lib/claims/data.ts                # new — seed claims + initial pool balance, mirrors the approved prototype's seed state
+├── src/lib/claims/stats.ts               # new — computeClaimStats, getRecentPayouts (pure, derived from claims)
+├── src/lib/claims/transitions.ts         # new — investigateClaim, payClaim (pure state transitions, no-op guarded)
+├── src/lib/claims/__tests__/stats.test.ts        # new
+├── src/lib/claims/__tests__/transitions.test.ts  # new
+├── src/App.tsx                           # modify — BrowserRouter + routes for /overview and /claims; owns claims + pool balance state
+├── src/components/AppSidebar.tsx         # modify — nav items become real route links with active-route highlighting; badge + footer read live state
+├── src/components/StatTile.tsx           # new — reusable stat card used by Overview
+├── src/routes/Overview.tsx               # new — stat tiles, payout pipeline, recent payouts table
+└── src/routes/ClaimsQueue.tsx            # new — claim list + selected claim's investigate/payout detail panel
 ```
 
 ---
 
 ## Action Items
 
-**[x] Scaffold the Vite + React + TypeScript + Tailwind v4 project**
+**[x] Add routing and wire it into the shell**
 
-Implement: `apps/fidelis/package.json`, `vite.config.ts`, `tsconfig.json`, `index.html` mirroring `tools/journey-tracker`'s proven config, adapted for the `apps/fidelis` package.
-
-Verify:
-```
-cd apps/fidelis && npm install && npm run build
-```
-→ exits 0
-
-**[x] Port journey-tracker's shadcn UI primitives unmodified**
-
-Implement: copy `src/lib/utils.ts`, `src/hooks/useIsMobile.ts`, `src/components/ui/button.tsx`, `separator.tsx`, `sheet.tsx`, `sidebar.tsx` verbatim from `tools/journey-tracker`. `sidebar.tsx` imports `Input` and `Skeleton` (`./input`, `./skeleton`) as hard dependencies not listed in the original plan — ported those two verbatim as well; without them `sidebar.tsx` cannot be kept unmodified.
-
-Verify:
-```
-diff tools/journey-tracker/src/components/ui/sidebar.tsx apps/fidelis/src/components/ui/sidebar.tsx
-```
-→ no output (files identical) — confirmed, plus `input.tsx` and `skeleton.tsx` diffed identical too
-
-**[x] Apply Fidelis's garnet theme tokens**
-
-Implement: `apps/fidelis/src/index.css` — Tailwind v4 theme block using `DESIGN.fidelis.md`'s light/dark color values in place of `tools/journey-tracker`'s own teal, plus the Plus Jakarta Sans and JetBrains Mono font declarations.
-
-Verify:
-```
-grep -q "8B3A46" apps/fidelis/src/index.css && echo FOUND
-```
-→ `FOUND`
-
-**[x] Build AppSidebar with Fidelis's nav and Reserve pool footer**
-
-Implement: `src/components/AppSidebar.tsx`, composed from the ported sidebar primitives, pinned to the published prototype's exact structure ([artifact ac20cb4d-f92e-4559-aa01-55ac8cec4921](https://claude.ai/code/artifact/ac20cb4d-f92e-4559-aa01-55ac8cec4921)):
-- header block — shield icon in a rounded badge, "Fidelis" title, "Agent Assurance · Insurer" subtitle underneath
-- nav list — "Overview" (grid icon) and "Claims Queue" (inbox icon, trailing item-count badge), both inert
-- footer block — "Reserve pool" label above the dollar-formatted balance, no icon
+Implement: `apps/fidelis/package.json` (add `react-router-dom`), `src/App.tsx` (`BrowserRouter`, routes for `/overview` and `/claims`, `/` redirects to `/overview`), `src/components/AppSidebar.tsx` (nav items become route links; the item matching the current route is marked active).
 
 Verify:
 ```
@@ -118,12 +86,42 @@ cd apps/fidelis && npx tsc --noEmit
 ```
 → exits 0
 
-**[x] Wire the shell into a running app**
+**[x] Add claims data and pure claim business logic — [unit]**
 
-Implement: `src/App.tsx` rendering `AppSidebar` plus a bare placeholder main area, `src/main.tsx` entry point.
+Implement: `src/lib/claims/types.ts`, `data.ts` (seed data mirroring the approved prototype: two claims, $48,800 pool balance), `stats.ts` (`computeClaimStats`, `getRecentPayouts`), `transitions.ts` (`investigateClaim`, `payClaim` — each a pure, no-op-guarded state transition per the Core Logic state diagram).
 
 Verify:
 ```
-cd apps/fidelis && npm run build
+cd apps/fidelis && npx vitest run
+```
+→ exits 0, all tests pass
+
+**[x] Wire claims state into the app shell**
+
+Implement: `src/App.tsx` — `useState` for claims and pool balance seeded from `src/lib/claims/data.ts`, handlers calling `investigateClaim`/`payClaim` and updating state, passed down to `AppSidebar` (badge count, footer balance) and both route screens.
+
+Verify:
+```
+cd apps/fidelis && npx tsc --noEmit
 ```
 → exits 0
+
+**[x] Build the Overview screen**
+
+Implement: `src/routes/Overview.tsx` + `src/components/StatTile.tsx` — four stat tiles (reserve pool, claims filed, claims paid, active policies), the prototype's static "how a claim gets paid" pipeline, and a recent-payouts table driven by `getRecentPayouts`, matching the published prototype's layout ([artifact ac20cb4d-f92e-4559-aa01-55ac8cec4921](https://claude.ai/code/artifact/ac20cb4d-f92e-4559-aa01-55ac8cec4921)).
+
+Verify:
+```
+cd apps/fidelis && npx tsc --noEmit
+```
+→ exits 0
+
+**[x] Build the Claims Queue screen**
+
+Implement: `src/routes/ClaimsQueue.tsx` — claim list (left) and the selected claim's detail panel (right) with Run Investigation / Run Payout buttons wired to the handlers from `App.tsx`, matching the published prototype's layout and button disabled-states.
+
+Verify:
+```
+cd apps/fidelis && npx tsc --noEmit && npm run build
+```
+→ both exit 0
