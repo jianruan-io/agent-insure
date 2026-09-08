@@ -6,9 +6,9 @@
 
 **Why:** Everything Northbeam-side currently lives only as a prototype link, which cannot itself be the submitted product. The shell is the one piece every other Northbeam screen depends on, so it comes first and stays deliberately minimal — no screen content yet.
 
-**How:** Stand up the application with its navigation shell — sidebar, nav items, footer — and the Overview screen behind it, matching the already-approved prototype and design spec exactly, content included. Rules, Activity, and Claims remain separate, later pieces of work; only Overview lands with the shell.
+**How:** Stand up the application with its full navigation — sidebar, real routing, and all four screens (Overview, Rules, Activity, Claims) — at 1:1 content and behavior parity with the already-approved published prototype, sharing one in-memory store so state (locking rules, a simulated attack, a filed claim) carries across routes exactly as it does in the prototype.
 
-**Scope correction (2026-09-08):** This spec originally deferred Overview's content to a follow-up issue. That was a misreading of the human's intent — the actual ask was 1:1 parity with the published artifact, shell and Overview together. Action Item 6 below restores that scope; everything else in this spec is unchanged.
+**Scope history:** This spec shipped in three passes on the same branch, each correcting a scope call that undershot the actual ask: shell-only → shell + Overview content → full routing with Rules/Activity/Claims built out. The final state above is what shipped; the Action Items below record each pass.
 
 **Zone 1 check:** Advances **Implementation** — a design already approved (published prototype + `DESIGN.northbeam.md`) is cheap to verify against here because the target output is fully specified in advance, not discovered during the work.
 
