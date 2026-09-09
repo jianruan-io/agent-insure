@@ -18,7 +18,7 @@
 
 ---
 
-## Not covered by an automated test — noted, not silently skipped
+## Not covered by a unit test — covered by Playwright instead
 
 - **Route wiring** (`registerClaimRoutes` mounting `POST /api/claims`, and its registration in `server/src/index.js`): follows the same pattern as `registerWorldRoutes`, which `world.test.js` also doesn't test directly — the spec's own `curl` Verify clause is the acceptance check for the wired route, same precedent as TECH-610.
-- **Frontend (`store.ts`, `Claims.tsx`)**: this repo has no unit-test harness for `apps/northbeam` (Playwright E2E only, per `TECH-610`'s precedent). The spec's `npm run build --prefix apps/northbeam` Verify clause catches type errors; the async wiring itself is checked by hand in the browser during Phase 2's Refactor step, per the spec's flagged `journey.json` gap (no formal `/e2e-verify` goal exists for this issue).
+- **Frontend (`store.ts`, `Claims.tsx`)**: this repo has no unit-test harness for `apps/northbeam` (Playwright E2E only, per `TECH-610`'s precedent). Covered instead by `apps/northbeam/e2e/claim-filing.spec.ts` — a real, headed run (no mocks either side) against the real backend, trace + video captured, per `spec.md`'s flagged `journey.json` gap.
