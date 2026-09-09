@@ -2,6 +2,10 @@
 node_modules/
 dist/
 
+# Playwright output
+test-results/
+playwright-report/
+
 # Secrets — .env.example stays tracked, everything else doesn't
 .env
 .env.local
