@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import { registerWorldRoutes } from './routes/world.js';
+import { registerClaimRoutes } from './routes/claims.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Secrets live in the repo-root .env.local, not inside server/ — see .env.example.
@@ -34,6 +35,7 @@ app.get('/health', (_req, res) => {
 });
 
 registerWorldRoutes(app);
+registerClaimRoutes(app);
 
 const port = process.env.PORT || 8787;
 app.listen(port, () => {
