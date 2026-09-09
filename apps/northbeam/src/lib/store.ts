@@ -55,10 +55,12 @@ export interface StoreState {
   activity: ActivityEntry[];
   claims: ClaimEntry[];
   nextActId: number;
-  nextClaimId: number;
 }
 
 const STORAGE_KEY = 'agent-insure-northbeam-v1';
+
+// Both Northbeam and Fidelis run on localhost during the hackathon — see SelfieModal.tsx.
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8787';
 
 const NORMAL_REASONING = 'Matches the locked vendor list — same account as every past payment. Approved.';
 const ATTACK_REASONING =
@@ -103,7 +105,6 @@ function seedState(): StoreState {
       },
     ],
     nextActId: 3,
-    nextClaimId: 1,
   };
 }
 
@@ -127,7 +128,7 @@ type Action =
   | { type: 'simulate-normal-invoice' }
   | { type: 'simulate-poisoned-invoice' }
   | { type: 'toggle-reason'; id: string }
-  | { type: 'file-claim'; activityId: string }
+  | { type: 'file-claim'; activityId: string; claimId: string }
   | { type: 'complete-selfie'; claimId: string }
   | { type: 'reset' };
 
@@ -179,7 +180,7 @@ function reducer(state: StoreState, action: Action): StoreState {
       const source = state.activity.find((a) => a.id === action.activityId);
       if (!source) return state;
       const claim: ClaimEntry = {
-        id: `c${state.nextClaimId}`,
+        id: action.claimId,
         vendor: source.vendor,
         amount: source.amount,
         time: source.time,
@@ -191,7 +192,6 @@ function reducer(state: StoreState, action: Action): StoreState {
         ...state,
         activity: state.activity.map((a) => (a.id === action.activityId ? { ...a, claimed: true } : a)),
         claims: [...state.claims, claim],
-        nextClaimId: state.nextClaimId + 1,
       };
     }
 
@@ -215,7 +215,7 @@ interface StoreContextValue {
   simulateNormalInvoice: () => void;
   simulatePoisonedInvoice: () => void;
   toggleReason: (id: string) => void;
-  fileClaim: (activityId: string) => void;
+  fileClaim: (activityId: string) => Promise<void>;
   completeSelfie: (claimId: string) => void;
   /** Re-seeds the whole store — the real equivalent of the prototype's `reset-demo`
    *  action, now that there's actual cross-screen state worth resetting. */
@@ -247,7 +247,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     simulateNormalInvoice: () => dispatch({ type: 'simulate-normal-invoice' }),
     simulatePoisonedInvoice: () => dispatch({ type: 'simulate-poisoned-invoice' }),
     toggleReason: (id) => dispatch({ type: 'toggle-reason', id }),
-    fileClaim: (activityId) => dispatch({ type: 'file-claim', activityId }),
+    fileClaim: async (activityId) => {
+      const source = state.activity.find((a) => a.id === activityId);
+      if (!source) return;
+      const response = await fetch(`${API_URL}/api/claims`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendor: source.vendor, amount: source.amount, activityId }),
+      });
+      if (!response.ok) throw new Error('Could not file the claim.');
+      const claim = await response.json();
+      dispatch({ type: 'file-claim', activityId, claimId: claim.id });
+    },
     completeSelfie: (claimId) => dispatch({ type: 'complete-selfie', claimId }),
     resetDemo: () => dispatch({ type: 'reset' }),
   };

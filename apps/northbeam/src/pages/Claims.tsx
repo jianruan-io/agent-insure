@@ -84,6 +84,7 @@ export function Claims() {
   const { state, fileClaim, completeSelfie } = useStore();
   const { activity, claims } = state;
   const [selfieClaimId, setSelfieClaimId] = useState<string | null>(null);
+  const [fileClaimError, setFileClaimError] = useState<string | null>(null);
 
   const eligible = activity.find((a) => a.flagged && !a.claimed);
   const cards = claims.slice().reverse();
@@ -91,8 +92,14 @@ export function Claims() {
   // can't leave the modal pointing at a claim that no longer exists.
   const selfieClaim = selfieClaimId ? claims.find((c) => c.id === selfieClaimId) : undefined;
 
-  function handleFileClaim() {
-    if (eligible) fileClaim(eligible.id);
+  async function handleFileClaim() {
+    if (!eligible) return;
+    setFileClaimError(null);
+    try {
+      await fileClaim(eligible.id);
+    } catch {
+      setFileClaimError('Could not file the claim — the backend is unreachable. Try again.');
+    }
   }
 
   function handleCompleteSelfie() {
@@ -115,6 +122,12 @@ export function Claims() {
       {!eligible ? (
         <div className="mb-4 rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
           No disputed payment yet — simulate a poisoned invoice on Activity first.
+        </div>
+      ) : null}
+
+      {fileClaimError ? (
+        <div className="mb-4 rounded-lg border border-dashed border-red-300 bg-red-50 p-3 text-xs text-red-600">
+          ⚠️ {fileClaimError}
         </div>
       ) : null}
 
