@@ -7,13 +7,12 @@ vi.mock('@worldcoin/idkit-core/signing', () => ({
 const { signRequest } = await import('@worldcoin/idkit-core/signing');
 const { createWorldRequest, verifyWorldProof } = await import('../world.js');
 
-const ENV_KEYS = ['WORLD_SIGNING_KEY', 'WORLD_APP_ID', 'WORLD_RP_ID', 'WORLD_ACTION_ID', 'WORLD_ENVIRONMENT'];
+const ENV_KEYS = ['WORLD_SIGNING_KEY', 'WORLD_APP_ID', 'WORLD_RP_ID', 'WORLD_ENVIRONMENT'];
 
 function setConfiguredEnv() {
   process.env.WORLD_SIGNING_KEY = '0xabc123';
   process.env.WORLD_APP_ID = 'app_test';
   process.env.WORLD_RP_ID = 'rp_test';
-  process.env.WORLD_ACTION_ID = 'file-claim';
   process.env.WORLD_ENVIRONMENT = 'sandbox';
 }
 
@@ -39,6 +38,7 @@ describe('createWorldRequest', () => {
     const request = createWorldRequest();
 
     expect(request.app_id).toBe('app_test');
+    expect(request.action).toBe('file-claim');
     expect(request.rp_context).toEqual({
       rp_id: 'rp_test',
       nonce: '0xnonce',

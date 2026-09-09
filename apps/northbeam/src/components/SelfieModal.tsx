@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { IDKitRequestWidget, type IDKitResult } from '@worldcoin/idkit';
+import { IDKitRequestWidget, selfieCheckLegacy, type IDKitResult } from '@worldcoin/idkit';
 import { Button } from './ui/button.js';
 
 /** Hand-drawn stroke SVG matching the approved Northbeam Portal prototype's close icon —
@@ -163,7 +163,8 @@ export function SelfieModal({ onClose, onComplete }: SelfieModalProps) {
               action={requestConfig.action}
               environment={requestConfig.environment}
               rp_context={requestConfig.rp_context}
-              allow_legacy_proofs={false}
+              allow_legacy_proofs={true}
+              preset={selfieCheckLegacy()}
               handleVerify={handleVerify}
               onSuccess={handleSuccess}
               onError={handleWidgetError}

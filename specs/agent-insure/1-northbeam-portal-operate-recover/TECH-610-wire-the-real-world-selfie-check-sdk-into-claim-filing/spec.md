@@ -99,6 +99,10 @@ npm run build --prefix apps/northbeam
 
 ---
 
-## Known dependency (not blocking this build)
+## Known dependency — resolved
 
-World's Selfie Check feature flag (TECH-604) is not approved yet. Every Action Item above builds and runs regardless — only the very last step (Guardian actually completing a live check successfully) is blocked on that flag. Once TECH-604 lands, no code changes here — it just starts working end to end.
+World's Selfie Check feature flag (TECH-604) was assumed to block the live end-to-end check until World approved it. Confirmed by hand on 2026-09-08 with a real Developer Portal app and a real device (World ID Sandbox, Android): the full flow works today — filing a claim, scanning the real QR code with the Sandbox app, and the claim moving from "awaiting identity" to "submitted" with a genuine World-issued proof. No flag approval turned out to be required for Sandbox testing with the `selfieCheckLegacy` preset.
+
+Two real integration details discovered only by testing against a real device, not visible from docs alone:
+- `IDKitRequestWidget` requires either a `preset` or `constraints` prop specifying which credential to request — `action` alone is just a scoping label, not a credential selector.
+- The newer `CredentialRequest('selfie')` (World ID 4.0) fails with `world_id_4_not_available` against this Sandbox identity; `selfieCheckLegacy()` with `allow_legacy_proofs: true` (World ID 3.0-compatible) is what actually works.

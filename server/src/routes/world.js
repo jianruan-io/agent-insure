@@ -2,21 +2,27 @@ import { signRequest } from '@worldcoin/idkit-core/signing';
 
 const VERIFY_BASE_URL = 'https://developer.world.org/api/v4/verify';
 
+// Not a secret, and never varies by environment — this must match the identifier of
+// the Action created in the Developer Portal's Actions tab (just a name/scope there;
+// which credential it requires — Selfie Check — is chosen in code, via the
+// `selfieCheckLegacy` preset passed to IDKitRequestWidget in SelfieModal.tsx).
+// A constant, not an env var: there's exactly one caller, and it's not something
+// anyone should need to change without also changing this file.
+const CLAIM_ACTION = 'file-claim';
+
 /**
  * Signs a fresh World ID connect request for the claim-filing Selfie Check action.
- * Pure local crypto — no network call. Throws if the app isn't configured yet
- * (waiting on World's Selfie Check feature flag) or if signing itself fails.
+ * Pure local crypto — no network call. Throws if the app's own credentials
+ * (app_id/rp_id/signing_key) haven't been set up yet, or if signing itself fails.
  */
 export function createWorldRequest() {
   const signingKeyHex = process.env.WORLD_SIGNING_KEY;
   const appId = process.env.WORLD_APP_ID;
   const rpId = process.env.WORLD_RP_ID;
-  const action = process.env.WORLD_ACTION_ID;
+  const action = CLAIM_ACTION;
 
-  if (!signingKeyHex || !appId || !rpId || !action) {
-    throw new Error(
-      'World ID is not configured yet — missing app_id, rp_id, signing key, or action (waiting on the Selfie Check feature flag).'
-    );
+  if (!signingKeyHex || !appId || !rpId) {
+    throw new Error('World ID is not configured yet — missing app_id, rp_id, or signing key.');
   }
 
   const { sig, nonce, createdAt, expiresAt } = signRequest({ signingKeyHex, action });

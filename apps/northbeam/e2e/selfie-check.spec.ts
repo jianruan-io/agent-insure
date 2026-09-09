@@ -63,9 +63,9 @@ test.describe('Guardian completes the identity check', () => {
     await page.getByRole('button', { name: 'Start face scan' }).click();
 
     // The fake timer never called any backend at all — proving this one did is the
-    // real signal here. (What the widget renders once it has genuine World-issued
-    // credentials, rather than this test's synthetic ones, can only be confirmed once
-    // TECH-604's flag is approved — see the note at the bottom of this file.)
+    // real signal here. (The full live flow — real QR, real scan, real verification —
+    // is confirmed working by hand against a real device; see the note at the bottom
+    // of this file for why it isn't automated.)
     await expect.poll(() => requestWasCalled).toBe(true);
     await expect(page.getByText('Scanning face… hold still')).toHaveCount(0);
   });
@@ -78,8 +78,7 @@ test.describe('Guardian completes the identity check', () => {
         status: 503,
         contentType: 'application/json',
         body: JSON.stringify({
-          error:
-            "World ID is not configured yet — missing app_id, rp_id, signing key, or action (waiting on the Selfie Check feature flag).",
+          error: 'World ID is not configured yet — missing app_id, rp_id, or signing key.',
         }),
       })
     );
@@ -95,11 +94,14 @@ test.describe('Guardian completes the identity check', () => {
   });
 });
 
-// Not automated, and not automatable without a real Developer Portal app: the IDKit
-// widget does real local validation of app_id/rp_id/signature before it will render
-// anything, and rejects synthetic test data as `generic_error` — confirmed by hand
-// while building this. So neither "the widget shows its real ready UI" nor "completing
-// the check moves the claim to submitted" can be shown by this test suite. Verify both
-// by hand once TECH-604's feature flag is approved: file a claim, scan with the World ID
-// Sandbox app, and confirm (a) the real widget UI renders and (b) the claim moves from
-// "awaiting identity" to "submitted".
+// Not automated, and not automatable without a real Developer Portal app + a physical
+// device: the IDKit widget does real local validation of app_id/rp_id/signature before
+// it will render anything, so synthetic test data can't reach a real QR code, and
+// completing a scan needs an actual World ID app on an actual phone — neither is
+// something Playwright can drive. CONFIRMED WORKING by hand, real device, real
+// credentials, 2026-09-08: filed a claim, scanned the real QR with the World ID
+// Sandbox app on Android, and the claim moved from "awaiting identity" to "submitted"
+// with "Identity verified — Guardian, AP Controller" shown. Uses the `selfieCheckLegacy`
+// preset with `allow_legacy_proofs: true` — the newer `CredentialRequest('selfie')` +
+// `allow_legacy_proofs: false` combination fails with `world_id_4_not_available` since
+// World ID 4.0 isn't available for this Sandbox identity yet.
