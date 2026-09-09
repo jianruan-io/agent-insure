@@ -71,7 +71,17 @@ flowchart TD
         SPECCHECK -- "all satisfied" --> MARKSPEC --> COMMIT
     end
 
-    COMMIT --> SURFACE
+    COMMIT --> HASGOAL
+
+    subgraph PHASE2B["Phase 2.5 · E2E Proof — delegated to /e2e-verify"]
+        HASGOAL{"Does this issue map to a Goal/Step in journey.json?"}
+        E2EVERIFY["Skill(e2e-verify): prove the goal for real against the running app — headed, video+trace on, no mocks except a documented physical-device exception"]
+        E2EGREEN{"e2e-verify returns green?"}
+        HASGOAL -- "no — infra/config only" --> SURFACE
+        HASGOAL -- "yes" --> E2EVERIFY --> E2EGREEN
+        E2EGREEN -- "no — gap found" --> IMPL
+        E2EGREEN -- "yes" --> SURFACE
+    end
 
     subgraph PHASE3["Phase 3 · Code Review"]
         SURFACE["Show diff --stat + Action Item → test table"]
@@ -116,6 +126,7 @@ Print at the top of every response without exception:
   🔗 PR:         [URL | "not yet opened"]
   📝 Spec:       [not yet written | written | approved]
   🧪 Test Plan:  [not yet written | written | approved]
+  🎥 E2E Proof:  [n/a — infra only | not yet run | running | recording path | "gap found — back in Build"]
 ```
 
 Examples:
@@ -131,6 +142,7 @@ Examples:
   🔗 PR:         not yet opened
   📝 Spec:       not yet written
   🧪 Test Plan:  not yet written
+  🎥 E2E Proof:  not yet run
 
 ▶ /sprint · Phase 2 Build · Step 3/6 Write Tests
   📁 Project:    MVP Production Rewrite
@@ -143,6 +155,20 @@ Examples:
   🔗 PR:         not yet opened
   📝 Spec:       approved
   🧪 Test Plan:  approved
+  🎥 E2E Proof:  not yet run
+
+▶ /sprint · Phase 2.5 E2E Proof · Step 3/4 Run and Diagnose
+  📁 Project:    MVP Production Rewrite
+  🏁 Milestone:  M1 · Foundation
+  🎫 Issue:      TECH-12 — Set Up Entity ID Generator
+  ⏱️ Estimate:   1 pt
+  📅 Due:        2026-05-18
+  🌿 Branch:     tech-12-set-up-entity-id-generator
+  📂 Worktree:   TECH-12-set-up-entity-id-generator
+  🔗 PR:         not yet opened
+  📝 Spec:       approved
+  🧪 Test Plan:  approved
+  🎥 E2E Proof:  running — headed, trace+video on
 
 ▶ /sprint · Phase 3 Code Review · Step 2/4 Wait for CI
   📁 Project:    MVP Production Rewrite
@@ -155,6 +181,7 @@ Examples:
   🔗 PR:         https://github.com/jianruan-io/agent-insure/pull/12
   📝 Spec:       approved
   🧪 Test Plan:  approved
+  🎥 E2E Proof:  test-results/g1-ap-controller-locks-rules/video.webm
 ```
 
 ---
@@ -162,12 +189,13 @@ Examples:
 ## Hard Rules
 
 **Read all referenced skills before Phase 1 begins**
-- **What:** Before executing any Phase 1 step, read the full SKILL.md for every skill referenced in this sprint: `/linear-issue`, `/git`. Do not rely on memory or prior context — read the files.
+- **What:** Before executing any Phase 1 step, read the full SKILL.md for every skill referenced in this sprint: `/linear-issue`, `/git`, `/e2e-verify`. Do not rely on memory or prior context — read the files.
 - **Why:** Skills are the source of truth for their own contracts. Skipping a read means operating from a stale or incomplete mental model — wrong paths, wrong conventions. This is exactly how errors like wrong worktree paths or wrong branch casing happen.
 - **How:** At sprint start, read these files in order before any other action:
   1. `/Users/aphanmiz/Desktop/Orbbit/orbbit-codebase/hackathon/agent-insure/.claude/skills/linear-issue/SKILL.md`
   2. `/Users/aphanmiz/Desktop/Orbbit/orbbit-codebase/hackathon/agent-insure/.claude/skills/git/references/branch.md`
   3. `/Users/aphanmiz/Desktop/Orbbit/orbbit-codebase/hackathon/agent-insure/.claude/skills/git/references/commit.md`
+  4. `/Users/aphanmiz/Desktop/Orbbit/orbbit-codebase/hackathon/agent-insure/.claude/skills/e2e-verify/SKILL.md`
   Then proceed with the SOP. Never skip this step, even if the sprint is a continuation.
 
 ---
@@ -209,9 +237,14 @@ Examples:
   - Phase 3 after cleanup: main session asserts `git branch --show-current` = `main` and runs `git pull` to receive the merged commits. If the worktree directory still exists, run `git worktree remove` before proceeding.
 
 **Phase Gates**
-- **What:** Three hard checkpoints where no work in the next phase may begin until the prior condition is met.
-- **Why:** Crossing a gate early collapses the zone boundary that makes each phase's output verifiable — implementation before tests means tests check code, not intent; a PR before human review means unreviewed code ships.
-- **How:** Never write implementation before tests are derived from every Action Item. Never open a PR before the human approves in Phase 3. Never mark an issue Done before committing with the Linear issue ID in the footer.
+- **What:** Four hard checkpoints where no work in the next phase may begin until the prior condition is met.
+- **Why:** Crossing a gate early collapses the zone boundary that makes each phase's output verifiable — implementation before tests means tests check code, not intent; a PR before real proof means the PR's own demo claim is unverified; a PR before human review means unreviewed code ships.
+- **How:** Never write implementation before tests are derived from every Action Item. Never open a PR before `/e2e-verify` returns green for any issue that maps to a journey.json Goal/Step (Phase 2.5) — infra-only issues with no Goal/Step skip straight to Phase 3. Never open a PR before the human approves in Phase 3. Never mark an issue Done before committing with the Linear issue ID in the footer.
+
+**Every issue with a user-visible outcome proves itself before its PR opens**
+- **What:** The instant Phase 2 reaches a committed, spec-satisfying green state, hand off to `/e2e-verify` (Phase 2.5) for any issue whose Action Items produce a Goal/Step in `tools/journey-tracker/public/journey.json`. It must return green — a real, headed Playwright run with trace and video captured, proving the outcome on screen — before Phase 3 opens the PR. A gap it finds sends the issue back to Phase 2 `IMPL`, not around the gate.
+- **Why:** This project ships as a live demo. A PR whose only proof is unit tests or a backend script is not demo-ready even when the logic is correct — nobody in the room can see it work. Making this automatic, on every issue, is what keeps `journey.json`'s `status` and the demo itself from silently diverging from what's actually shipped.
+- **How:** `/e2e-verify` decides for itself (Phase 1 of that skill) whether an issue's Action Items are infra/config-only (no Goal/Step, skip) or map to a real Step (run it). Never skip the gate to save time on a real user-facing change — if it feels slow, that's the spec's scope signal from Phase 1 (split before ratifying), not a reason to bypass proof. The recording path `/e2e-verify` returns goes into the PR description alongside the diff map.
 
 **Phase 1 runs on main — no files until the worktree exists**
 - **What:** Main must be clean and in sync with remote before any Phase 1 work begins.

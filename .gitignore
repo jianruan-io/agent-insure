@@ -14,5 +14,6 @@ playwright-report/
 # Ideation brainstorm scratchpad
 tools/journey-tracker/
 
-# Documentation / other references dump
-references/
+# Documentation / other references dump (top-level only — NOT .claude/skills/*/references/,
+# which are real, tracked skill content; a bare pattern here would silently ignore those too)
+/references/
