@@ -1,4 +1,24 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+const STORAGE_KEY = 'agent-insure-northbeam-v1';
+
+/**
+ * Seeds `rules.locked` directly in localStorage instead of driving the real ENS
+ * write-then-lock flow through the UI. This test's Goal is claim filing, not the ENS lock
+ * itself — TECH-606's `lock-rules.spec.ts` is the one place that proves the real on-chain
+ * lock, with no mocking of the chain interaction. Re-driving that same real, permanent,
+ * gas-costing flow here on every claim-filing run would be slow and would re-test a
+ * different Goal's mechanism, not this one.
+ */
+async function lockRulesForTest(page: Page) {
+  await page.goto('/rules'); // first load seeds localStorage via the store's own seedState()
+  await page.evaluate((key) => {
+    const raw = JSON.parse(localStorage.getItem(key) ?? '{}');
+    raw.rules = { ...raw.rules, locked: true };
+    localStorage.setItem(key, JSON.stringify(raw));
+  }, STORAGE_KEY);
+  await page.reload();
+}
 
 /**
  * No mocking here, on either side — unlike selfie-check.spec.ts, which mocks the World
@@ -8,9 +28,8 @@ import { test, expect } from '@playwright/test';
  */
 test.describe('AP controller files a claim against a real backend record', () => {
   test('filing a claim creates a real backend record and renders it with the server-issued id', async ({ page }) => {
-    await test.step('lock the spending rules', async () => {
-      await page.goto('/rules');
-      await page.getByRole('button', { name: 'Lock Rules On-Chain' }).click();
+    await test.step('spending rules are already locked', async () => {
+      await lockRulesForTest(page);
       await expect(page.getByText('Locked on ENS')).toBeVisible();
     });
 
