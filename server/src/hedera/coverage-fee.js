@@ -1,6 +1,6 @@
 import { HTTPFacilitatorClient } from '@x402/core/server';
 import { ExactHederaScheme } from '@x402/hedera/exact/client';
-import { createClientHederaSigner, HEDERA_TESTNET_USDC } from '@x402/hedera';
+import { createClientHederaSigner } from '@x402/hedera';
 
 /**
  * The x402 coverage fee — charged automatically before any vendor payment can
@@ -10,13 +10,20 @@ import { createClientHederaSigner, HEDERA_TESTNET_USDC } from '@x402/hedera';
  * shipped type declarations, not guessed — see this issue's spec for how.
  */
 
-const DEFAULT_ASSET = HEDERA_TESTNET_USDC; // '0.0.429274'
+// HBAR, not @x402/hedera's HEDERA_TESTNET_USDC — that HTS token's real testnet treasury
+// (0.0.5176) has no public faucet, so PayableAgent's operator account can never hold any
+// of it. HBAR is a first-class asset in @x402/hedera's own exact scheme (HBAR_ASSET_ID =
+// "0.0.0", branched explicitly in its preflight/signer code) and the operator already
+// holds real testnet HBAR, confirmed by actually running the fee charge end to end.
+const DEFAULT_ASSET = '0.0.0';
 const DEFAULT_FACILITATOR_URL = 'https://api.testnet.blocky402.com';
-const X402_VERSION = 1;
+// Confirmed against the live facilitator's own /supported response — it registers only
+// x402Version 2 and rejects version 1 outright ("No facilitator registered for x402 version: 1").
+const X402_VERSION = 2;
 const RESOURCE_URL = '/api/coverage/charge';
 
 /** Builds one real PaymentRequirements row. Pure. */
-export function buildCoverageFeeRequirements({ amount, payToAccountId, asset = DEFAULT_ASSET }) {
+export function buildCoverageFeeRequirements({ amount, payToAccountId, asset = DEFAULT_ASSET, feePayer }) {
   if (!amount || Number(amount) <= 0) {
     throw new Error('Coverage fee amount must be a positive value — refusing to charge nothing.');
   }
@@ -29,8 +36,24 @@ export function buildCoverageFeeRequirements({ amount, payToAccountId, asset = D
     payTo: payToAccountId,
     amount: String(amount),
     maxTimeoutSeconds: 60,
-    extra: {},
+    extra: feePayer ? { feePayer } : {},
   };
+}
+
+/**
+ * @x402/hedera's exact scheme refuses to build or verify a payment without a Hedera
+ * account named as the network-fee payer in `extra.feePayer` — real, confirmed by running
+ * this against the live facilitator, not documented in the type declarations alone.
+ * Blocky402 advertises its own fee-payer account for `hedera:testnet` via its `/supported`
+ * endpoint (`kinds[].extra.feePayer`); fetched for real so a facilitator-side rotation of
+ * that account doesn't silently break this instead of being hardcoded and going stale.
+ */
+async function getHederaFeePayer(facilitator) {
+  const supported = await facilitator.getSupported();
+  const kind = supported.kinds.find((k) => k.scheme === 'exact' && k.network === 'hedera:testnet');
+  const feePayer = kind?.extra?.feePayer;
+  if (!feePayer) throw new Error('Blocky402 did not advertise a Hedera fee payer for hedera:testnet.');
+  return feePayer;
 }
 
 /** The full HTTP 402 body — wraps the requirements the way the protocol expects. Pure. */
@@ -64,11 +87,13 @@ function getFacilitator() {
  * (no X-PAYMENT) returns the 402 challenge; a call with a valid payment proof
  * verifies and settles it for real through Blocky402, returning the receipt.
  */
-export function registerCoverageFeeRoute(app, { getRequirements }) {
+export function registerCoverageFeeRoute(app, { getRequirementParams }) {
   app.post('/api/coverage/charge', async (req, res) => {
     let requirements;
     try {
-      requirements = getRequirements();
+      const facilitator = getFacilitator();
+      const feePayer = await getHederaFeePayer(facilitator);
+      requirements = buildCoverageFeeRequirements({ ...getRequirementParams(), feePayer });
     } catch (err) {
       // A config problem (e.g. HEDERA_RESERVE_POOL_ACCOUNT_ID not set yet) is a real
       // 500, not a payment problem — and must never take the whole process down.
@@ -110,7 +135,9 @@ async function settleCoverageFee(paymentHeaderBase64, requirements) {
  * real signed Hedera transfer for the requirements, then verify+settle it.
  */
 export async function chargeCoverageFee({ amount, payToAccountId, asset, payerAccountId, payerPrivateKey }) {
-  const requirements = buildCoverageFeeRequirements({ amount, payToAccountId, asset });
+  const facilitator = getFacilitator();
+  const feePayer = await getHederaFeePayer(facilitator);
+  const requirements = buildCoverageFeeRequirements({ amount, payToAccountId, asset, feePayer });
   const signer = createClientHederaSigner(payerAccountId, payerPrivateKey);
   const scheme = new ExactHederaScheme(signer);
   const payloadResult = await scheme.createPaymentPayload(X402_VERSION, requirements);

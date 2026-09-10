@@ -13,10 +13,10 @@ function hashscanTxUrl(transactionId: string): string {
   return `https://hashscan.io/testnet/transaction/${transactionId}`;
 }
 
-/** The x402 coverage fee is charged in HEDERA_TESTNET_USDC, a 6-decimal token — the raw
- *  amount PayableAgent's backend sends (e.g. "10000") is 0.01 USDC, not $0.01 of HBAR. */
+/** The x402 coverage fee is charged in HBAR — the raw amount PayableAgent's backend
+ *  sends is in tinybars (1 HBAR = 10^8 tinybars), e.g. "10000000" is 0.1 HBAR. */
 function formatFeeAmount(rawAmount: string): string {
-  return `$${(Number(rawAmount) / 1_000_000).toFixed(2)} USDC`;
+  return `${(Number(rawAmount) / 100_000_000).toFixed(2)} ℏ`;
 }
 
 /** One row of the Activity Feed table, plus its collapsible reasoning row underneath —

@@ -4,7 +4,7 @@ import { getPayableAgentClient, getPayableAgentAccountId, getPayableAgentPrivate
 import { chargeCoverageFee } from '../hedera/coverage-fee.js';
 import { logPaymentToHcs } from '../hedera/hcs.js';
 
-const COVERAGE_FEE_AMOUNT = process.env.HEDERA_COVERAGE_FEE_AMOUNT || '10000'; // 0.01 test USDC, fixed by design
+const COVERAGE_FEE_AMOUNT = process.env.HEDERA_COVERAGE_FEE_AMOUNT || '10000000'; // 0.1 test HBAR, fixed by design
 const VENDOR_PAYMENT_ASSET = '0.0.0'; // vendor invoices are settled in HBAR, not the x402 fee's USDC
 const CLAUDE_MODEL = 'claude-sonnet-5';
 

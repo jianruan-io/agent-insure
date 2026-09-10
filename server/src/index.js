@@ -6,7 +6,7 @@ import cors from 'cors';
 import { registerWorldRoutes } from './routes/world.js';
 import { registerClaimRoutes } from './routes/claims.js';
 import { registerActivityRoutes } from './routes/activity.js';
-import { registerCoverageFeeRoute, buildCoverageFeeRequirements } from './hedera/coverage-fee.js';
+import { registerCoverageFeeRoute } from './hedera/coverage-fee.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Secrets live in the repo-root .env.local, not inside server/ — see .env.example.
@@ -39,11 +39,10 @@ app.get('/health', (_req, res) => {
 registerWorldRoutes(app);
 registerClaimRoutes(app);
 registerCoverageFeeRoute(app, {
-  getRequirements: () =>
-    buildCoverageFeeRequirements({
-      amount: process.env.HEDERA_COVERAGE_FEE_AMOUNT || '10000',
-      payToAccountId: process.env.HEDERA_RESERVE_POOL_ACCOUNT_ID,
-    }),
+  getRequirementParams: () => ({
+    amount: process.env.HEDERA_COVERAGE_FEE_AMOUNT || '10000000',
+    payToAccountId: process.env.HEDERA_RESERVE_POOL_ACCOUNT_ID,
+  }),
 });
 registerActivityRoutes(app, {
   // Seed vendor — mirrors the frontend's own locked, ENS-approved vendor (TECH-606).
