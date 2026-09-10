@@ -5,6 +5,8 @@ import express from 'express';
 import cors from 'cors';
 import { registerWorldRoutes } from './routes/world.js';
 import { registerClaimRoutes } from './routes/claims.js';
+import { registerActivityRoutes } from './routes/activity.js';
+import { registerCoverageFeeRoute, buildCoverageFeeRequirements } from './hedera/coverage-fee.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Secrets live in the repo-root .env.local, not inside server/ — see .env.example.
@@ -36,6 +38,33 @@ app.get('/health', (_req, res) => {
 
 registerWorldRoutes(app);
 registerClaimRoutes(app);
+registerCoverageFeeRoute(app, {
+  getRequirements: () =>
+    buildCoverageFeeRequirements({
+      amount: process.env.HEDERA_COVERAGE_FEE_AMOUNT || '10000',
+      payToAccountId: process.env.HEDERA_RESERVE_POOL_ACCOUNT_ID,
+    }),
+});
+registerActivityRoutes(app, {
+  // Seed vendor — mirrors the frontend's own locked, ENS-approved vendor (TECH-606).
+  getVendor: () => ({
+    name: 'Acme Corp',
+    hederaAccountId: process.env.HEDERA_VENDOR_ACCOUNT_ID,
+    amount: 500,
+  }),
+  // The poisoned path's hardcoded wrong destination — reuses the reserve pool account
+  // (a real, already-funded account) rather than provisioning a third one for this.
+  // Real deception (a Claude call actually fooled into picking this) is TECH-608.
+  wrongAccountId: process.env.HEDERA_RESERVE_POOL_ACCOUNT_ID,
+});
+
+// Last line of defense: Express 4 doesn't catch an async handler's thrown error on
+// its own — without this, one bad request (e.g. a config problem surfacing as a
+// synchronous throw) takes the whole process down instead of just failing that request.
+app.use((err, _req, res, _next) => {
+  console.error(err);
+  res.status(500).json({ error: 'Internal server error' });
+});
 
 const port = process.env.PORT || 8787;
 app.listen(port, () => {
