@@ -1,8 +1,22 @@
+import { useEffect } from 'react';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { Card, CardContent } from '../components/ui/card.js';
 import { StatTile } from '../components/StatTile.js';
 import { useStore } from '../lib/store.js';
+
+function etherscanTxUrl(txHash: string): string {
+  return `https://sepolia.etherscan.io/tx/${txHash}`;
+}
+
+const LOCK_BUTTON_LABEL: Record<string, string> = {
+  idle: 'Lock Rules On-Chain',
+  written: 'Finish Locking On-Chain',
+  connecting: 'Connecting wallet…',
+  writing: 'Writing to ENS…',
+  locking: 'Locking permissions…',
+  error: 'Retry Lock Rules On-Chain',
+};
 
 /** Hand-drawn stroke SVG matching the approved Northbeam Portal prototype's check icon —
  *  same convention as AppSidebar.tsx/Overview.tsx (never an icon-library glyph). */
@@ -35,8 +49,17 @@ function money(amount: number) {
  * what unlocks Activity's poisoned-invoice simulation for the rest of the demo.
  */
 export function Rules() {
-  const { state, lockRules } = useStore();
+  const { state, lockRules, syncRulesFromChain } = useStore();
   const { rules } = state;
+
+  // The screen only ever calls this "Locked" once the real on-chain record backs it up —
+  // never from the click alone. Best-effort: a stale read leaves the button ready to retry.
+  useEffect(() => {
+    void syncRulesFromChain();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const busy = rules.lockStatus === 'connecting' || rules.lockStatus === 'writing' || rules.lockStatus === 'locking';
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -74,11 +97,57 @@ export function Rules() {
           </div>
 
           {rules.locked ? (
-            <div className="flex items-center gap-2 rounded-lg bg-[var(--success)]/10 px-3 py-2 text-sm font-semibold text-[var(--success)]">
-              <CheckIcon /> Locked on ENS — cannot be silently changed <Badge variant="ens">ENS</Badge>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 rounded-lg bg-[var(--success)]/10 px-3 py-2 text-sm font-semibold text-[var(--success)]">
+                <CheckIcon /> Locked on ENS — cannot be silently changed <Badge variant="ens">ENS</Badge>
+              </div>
+              <div className="flex flex-col gap-0.5 pl-1 font-mono text-xs text-muted-foreground">
+                {rules.writeTxHash ? (
+                  <a
+                    className="underline decoration-dotted hover:text-foreground"
+                    href={etherscanTxUrl(rules.writeTxHash)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    write tx: {rules.writeTxHash.slice(0, 10)}…
+                  </a>
+                ) : null}
+                {rules.lockTxHash ? (
+                  <a
+                    className="underline decoration-dotted hover:text-foreground"
+                    href={etherscanTxUrl(rules.lockTxHash)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    lock tx: {rules.lockTxHash.slice(0, 10)}…
+                  </a>
+                ) : null}
+              </div>
             </div>
           ) : (
-            <Button onClick={lockRules}>Lock Rules On-Chain</Button>
+            <div>
+              <Button onClick={() => void lockRules()} disabled={busy}>
+                {LOCK_BUTTON_LABEL[rules.lockStatus] ?? LOCK_BUTTON_LABEL.idle}
+              </Button>
+              {rules.lockStatus === 'written' && rules.writeTxHash ? (
+                <p className="mt-2 font-mono text-xs text-muted-foreground">
+                  <a
+                    className="underline decoration-dotted hover:text-foreground"
+                    href={etherscanTxUrl(rules.writeTxHash)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    write tx: {rules.writeTxHash.slice(0, 10)}…
+                  </a>{' '}
+                  — written, not yet locked
+                </p>
+              ) : null}
+              {rules.lockStatus === 'error' && rules.lockError ? (
+                <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-destructive">
+                  <Badge variant="destructive">Error</Badge> {rules.lockError}
+                </p>
+              ) : null}
+            </div>
           )}
 
           {!rules.locked ? (
