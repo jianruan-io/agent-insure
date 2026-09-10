@@ -16,7 +16,7 @@ function getHint(state: StoreState): string {
   if (!openFlag && nonSeedClaims.length === 0) return 'Next: simulate a poisoned invoice — Activity.';
   if (openFlag) return 'Next: file a claim for the flagged payment — Claims.';
   if (awaiting) return 'Next: complete the live face scan on that claim.';
-  if (submitted) return 'Filed. Resolution now happens on Fidelis Agent Assurance’s side.';
+  if (submitted) return 'Filed. Resolution now happens on Agent Insure’s side.';
   return 'Click through each screen — everything here is live.';
 }
 

@@ -22,7 +22,7 @@ interface AppSidebarProps {
 }
 
 /**
- * Fidelis Portal's permanent navigation shell. See spec TECH-623.
+ * Agent Insure HQ's permanent navigation shell. See spec TECH-623.
  */
 export function AppSidebar({ claims, poolBalance }: AppSidebarProps) {
   const location = useLocation();
@@ -40,9 +40,9 @@ export function AppSidebar({ claims, poolBalance }: AppSidebarProps) {
             <Shield className="size-4" />
           </span>
           <div className="flex min-w-0 flex-col group-data-[collapsible=icon]:hidden">
-            <span className="truncate text-sm font-bold">Fidelis</span>
+            <span className="truncate text-sm font-bold">Agent Insure</span>
             <span className="truncate text-[10px] font-medium uppercase tracking-wide text-sidebar-foreground/60">
-              Agent Assurance · Insurer
+              Insurer
             </span>
           </div>
         </div>

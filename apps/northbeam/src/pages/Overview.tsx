@@ -195,7 +195,7 @@ export function Overview() {
             tone="hedera"
             icon={<VaultIcon />}
             title="Claims + vault"
-            description="Hedera logs every action and holds the reserve pool the payout is drawn from at Fidelis."
+            description="Hedera logs every action and holds the reserve pool the payout is drawn from at Agent Insure."
             isLast
           />
         </CardContent>

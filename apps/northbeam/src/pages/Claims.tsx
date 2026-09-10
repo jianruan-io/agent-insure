@@ -47,7 +47,7 @@ function ClaimCard({ claim, onStartSelfie }: { claim: ClaimEntry; onStartSelfie:
   } else if (claim.status === 'submitted') {
     body = (
       <div className="text-sm text-muted-foreground">
-        ⏳ Submitted — now with Fidelis Agent Assurance for investigation
+        ⏳ Submitted — now with Agent Insure for investigation
       </div>
     );
   } else {
