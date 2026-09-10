@@ -18,6 +18,7 @@ export interface Vendor {
 export interface ActivityEntry {
   id: string;
   vendor: string;
+  /** The real Hedera account the payment actually reached — not the old ENS-scope address. */
   account: string;
   amount: number;
   time: string;
@@ -28,6 +29,12 @@ export interface ActivityEntry {
   /** Whether this row's "reason" toggle is currently expanded. */
   expanded: boolean;
   reasoning: string;
+  /** Real proof, only present on rows created by the real payment flow — the two seed
+   *  rows and anything from before this field existed simply don't have it. */
+  feeAmount?: string;
+  feeTxHash?: string;
+  paymentTxHash?: string;
+  hcsSequenceNumber?: string;
 }
 
 export type ClaimStatus = 'approved' | 'submitted' | 'awaiting-identity';
@@ -63,6 +70,9 @@ export interface StoreState {
   activity: ActivityEntry[];
   claims: ClaimEntry[];
   nextActId: number;
+  /** True while a real payment simulation (either button) is in flight. */
+  activitySimulating: boolean;
+  activitySimulateError: string | null;
 }
 
 const STORAGE_KEY = 'agent-insure-business-v1';
@@ -121,6 +131,8 @@ function seedState(): StoreState {
       },
     ],
     nextActId: 3,
+    activitySimulating: false,
+    activitySimulateError: null,
   };
 }
 
@@ -146,8 +158,9 @@ type Action =
   | { type: 'lock-rules-write-confirmed'; txHash: string }
   | { type: 'lock-rules-locked'; txHash: string | null }
   | { type: 'lock-rules-error'; message: string }
-  | { type: 'simulate-normal-invoice' }
-  | { type: 'simulate-poisoned-invoice' }
+  | { type: 'simulate-start' }
+  | { type: 'simulate-success'; entry: ActivityEntry }
+  | { type: 'simulate-error'; message: string }
   | { type: 'toggle-reason'; id: string }
   | { type: 'file-claim'; activityId: string; claimId: string }
   | { type: 'complete-selfie'; claimId: string }
@@ -178,38 +191,19 @@ function reducer(state: StoreState, action: Action): StoreState {
     case 'lock-rules-error':
       return { ...state, rules: { ...state.rules, lockStatus: 'error', lockError: action.message } };
 
-    case 'simulate-normal-invoice': {
-      const vendor = state.rules.vendors[0];
-      const entry: ActivityEntry = {
-        id: `a${state.nextActId}`,
-        vendor: vendor.name,
-        account: vendor.account,
-        amount: 500,
-        time: 'Just now',
-        flagged: false,
-        claimed: false,
-        expanded: false,
-        reasoning: NORMAL_REASONING,
-      };
-      return { ...state, activity: [...state.activity, entry], nextActId: state.nextActId + 1 };
-    }
+    case 'simulate-start':
+      return { ...state, activitySimulating: true, activitySimulateError: null };
 
-    case 'simulate-poisoned-invoice': {
-      const entry: ActivityEntry = {
-        id: `a${state.nextActId}`,
-        vendor: state.rules.vendors[0].name,
-        // Always a brand-new account, never the locked vendor's own address — this is
-        // what makes the row "poisoned": same vendor name, different real destination.
-        account: '0x8f31…d92e',
-        amount: 500,
-        time: 'Just now',
-        flagged: true,
-        claimed: false,
-        expanded: false,
-        reasoning: ATTACK_REASONING,
+    case 'simulate-success':
+      return {
+        ...state,
+        activity: [...state.activity, action.entry],
+        nextActId: state.nextActId + 1,
+        activitySimulating: false,
       };
-      return { ...state, activity: [...state.activity, entry], nextActId: state.nextActId + 1 };
-    }
+
+    case 'simulate-error':
+      return { ...state, activitySimulating: false, activitySimulateError: action.message };
 
     case 'toggle-reason':
       return {
@@ -270,8 +264,8 @@ interface StoreContextValue {
   lockRules: () => Promise<void>;
   /** Best-effort read of the real on-chain state — never trusts the click alone. */
   syncRulesFromChain: () => Promise<void>;
-  simulateNormalInvoice: () => void;
-  simulatePoisonedInvoice: () => void;
+  simulateNormalInvoice: () => Promise<void>;
+  simulatePoisonedInvoice: () => Promise<void>;
   toggleReason: (id: string) => void;
   fileClaim: (activityId: string) => Promise<void>;
   completeSelfie: (claimId: string) => void;
@@ -298,6 +292,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // no-op — persistence is a nice-to-have, not a requirement to keep working
     }
   }, [state]);
+
+  /** Calls the real payment pipeline (Claude decision or hardcoded poisoned target →
+   *  x402 coverage fee → Hedera vendor transfer → HCS log) and dispatches its real result. */
+  const simulateInvoice = async (kind: 'normal' | 'poisoned') => {
+    dispatch({ type: 'simulate-start' });
+    try {
+      const response = await fetch(`${API_URL}/api/activity/simulate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error ?? 'Could not simulate the payment.');
+      const entry: ActivityEntry = {
+        id: `a${state.nextActId}`,
+        vendor: body.vendor,
+        account: body.account,
+        amount: body.amount,
+        time: 'Just now',
+        flagged: kind === 'poisoned',
+        claimed: false,
+        expanded: false,
+        reasoning: kind === 'poisoned' ? ATTACK_REASONING : NORMAL_REASONING,
+        feeAmount: body.feeAmount,
+        feeTxHash: body.feeTxHash,
+        paymentTxHash: body.paymentTxHash,
+        hcsSequenceNumber: body.hcsSequenceNumber,
+      };
+      dispatch({ type: 'simulate-success', entry });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not simulate the payment.';
+      dispatch({ type: 'simulate-error', message });
+    }
+  };
 
   const value: StoreContextValue = {
     state,
@@ -338,8 +366,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // button's own click flow surfaces a real error if so.
       }
     },
-    simulateNormalInvoice: () => dispatch({ type: 'simulate-normal-invoice' }),
-    simulatePoisonedInvoice: () => dispatch({ type: 'simulate-poisoned-invoice' }),
+    simulateNormalInvoice: () => simulateInvoice('normal'),
+    simulatePoisonedInvoice: () => simulateInvoice('poisoned'),
     toggleReason: (id) => dispatch({ type: 'toggle-reason', id }),
     fileClaim: async (activityId) => {
       const source = state.activity.find((a) => a.id === activityId);
