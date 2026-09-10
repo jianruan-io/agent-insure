@@ -25,7 +25,7 @@ flowchart TD
     WRITE --> CONFIRM1["Transaction confirms on Sepolia"]
     CONFIRM1 --> LOCK["Wallet signs write #2:<br/>revoke the AP controller's own<br/>edit permission (Enhanced Access Control)"]
     LOCK --> CONFIRM2["Transaction confirms on Sepolia"]
-    CONFIRM2 --> SHOW["Rules screen shows both tx hashes,<br/>Sepolia Etherscan links, and Locked —<br/>read back from the real on-chain state"]
+    CONFIRM2 --> SHOW["Rules screen shows both tx hashes<br/>from this session, plus Locked —<br/>the Locked state itself read back from on-chain"]
     CONNECT -- "no wallet found /<br/>connection rejected" --> ERR1["Real error shown — rules stay unlocked"]
     WRITE -- "signature rejected /<br/>transaction reverts" --> ERR2["Real error shown — nothing written, rules stay unlocked"]
     LOCK -- "signature rejected /<br/>transaction reverts" --> ERR3["Real error shown — written but not locked"]
@@ -33,7 +33,7 @@ flowchart TD
 
 ### Business rules
 
-- The Rules screen only shows "Locked" after reading the lock state back from the actual on-chain record — never from the button click alone.
+- The Rules screen only shows "Locked" after reading the lock state back from the actual on-chain record — never from the button click alone. Transaction hashes, by contrast, aren't on-chain state (they're history, not a value the resolver stores) — they're only ever shown for the session that performed the write/lock, not re-derived on a later visit.
 - Locking is two separate signed transactions, write then lock. A failure between them leaves a real, distinct, visible "written but not locked" state on screen — it is never silently treated as either fully locked or fully unlocked.
 - The budget cap and vendor list values written on-chain are exactly the existing fixed values already shown in the UI — this issue does not add editing for either field.
 - Once the lock transaction confirms, the AP controller's own wallet can no longer write to `payableagent.agentinsure.eth`'s records — enforced by the real on-chain permission system (Enhanced Access Control), not by the frontend merely hiding an edit button.
@@ -43,32 +43,34 @@ flowchart TD
 ## File Tree
 
 ```
-scripts/
-  register-agentinsure-eth.mjs   # new — one-time script: registers agentinsure.eth on the hackathon's ETHRegistrar with PermissionedResolverImpl as its resolver. Run once by hand before this spec's other items are verified — not part of the live demo flow.
+.env.example                        # modified — document SEPOLIA_PRIVATE_KEY and the hackathon ENS contract addresses (backend/script-only, per this repo's existing root-secrets convention)
 apps/northbeam/
-  package.json                   # modified — add viem
-  .env.example                   # modified — document the registered name and the hackathon contract addresses read at runtime
+  package.json                      # modified — add viem
+  .env.example                      # modified — document the registered name + resolver address (frontend-only, VITE_-prefixed)
+  scripts/
+    register-agentinsure-eth.mjs    # new — one-time script: registers agentinsure.eth on the hackathon's ETHRegistrar, deploys a dedicated resolver proxy. Run once by hand — not part of the live demo flow.
+    normalize-private-key.mjs       # new — shared key-parsing helper for the script and the e2e test
   src/
     lib/
-      ens.ts                     # new — wallet connect + write/lock/read against payableagent.agentinsure.eth
-      store.ts                   # modified — lockRules becomes async, drives the real write-then-lock flow
+      ens.ts                        # new — wallet connect + write/lock/read against payableagent.agentinsure.eth
+      store.ts                      # modified — lockRules becomes async, drives the real write-then-lock flow
     pages/
-      Rules.tsx                  # modified — Lock Rules On-Chain triggers the real flow; shows tx hashes, Etherscan links, and each error state from Core Logic
+      Rules.tsx                     # modified — Lock Rules On-Chain triggers the real flow; shows tx hashes, Etherscan links, and each error state from Core Logic
   e2e/
-    lock-rules.spec.ts           # new — real, headed Playwright proof using a documented test-mode signer
+    lock-rules.spec.ts              # new — real, headed Playwright proof using a documented test-mode signer
 ```
 
 ---
 
 ## Action Items
 
-**[ ] Register `agentinsure.eth` once, on the hackathon's ENSv2 deployment**
+**[x] Register `agentinsure.eth` once, on the hackathon's ENSv2 deployment**
 
-Implement: Create `scripts/register-agentinsure-eth.mjs` — checks whether `agentinsure.eth` is already registered on the hackathon's `ETHRegistrar` (`0x7d1b7f586a62ac3f54b9a396849757814283270b`); if not, mints and approves `MockUSDC` (`0xcbfd80f74375c54e545af34788ff465f96f66f05`) as payment and registers it with `PermissionedResolverImpl` (`0xa9d3814ab151bf6e37a427432795371a8361614e`) set as its resolver, owned by `SEPOLIA_WALLET_ADDRESS`. Document these addresses plus the registered name in `.env.example`. Run once, by hand, before verifying the remaining items.
+Implement: Create `apps/northbeam/scripts/register-agentinsure-eth.mjs` — checks whether `agentinsure.eth` is already registered on the hackathon's `ETHRegistrar` (`0x7d1b7f586a62ac3f54b9a396849757814283270b`); if not, deploys a dedicated resolver proxy (via `VerifiableFactory`, never the shared `PermissionedResolverImpl` address directly) granting `SEPOLIA_PRIVATE_KEY`'s own wallet write+admin permission, then mints and approves `MockUSDC` (`0xcbfd80f74375c54e545af34788ff465f96f66f05`) as payment and registers the name with that proxy as its resolver. Document these addresses in the root `.env.example`. Run once, by hand, before verifying the remaining items.
 
 Verify:
 ```
-node scripts/register-agentinsure-eth.mjs
+node apps/northbeam/scripts/register-agentinsure-eth.mjs
 ```
 → exits 0; prints a real transaction hash on first run, prints "already registered, skipping" on every run after
 
@@ -95,7 +97,7 @@ npm run build --prefix apps/northbeam
 ```
 → exits 0, no type errors
 
-**[ ] Prove it end-to-end against the real chain**
+**[x] Prove it end-to-end against the real chain**
 
 Implement: Add `apps/northbeam/e2e/lock-rules.spec.ts` — a real, headed Playwright test that clicks Lock Rules On-Chain and drives the write-then-lock flow through a documented test-mode signer (a Sepolia private key used only in test mode, following the same documented convention as `apps/northbeam/e2e/selfie-check.spec.ts`, since Playwright cannot click a real MetaMask popup), asserting the UI ends on real transaction hashes and an on-chain-confirmed Locked state.
 
@@ -107,17 +109,17 @@ npx playwright test apps/northbeam/e2e/lock-rules.spec.ts --reporter=list
 
 ---
 
-## Known gap — flagged, not resolved here
+## Proven for real — on Sepolia, not simulated
 
-Action Items 1 and 4 need a real, funded Sepolia wallet's private key — something this session doesn't have and shouldn't generate or ask to have pasted into chat. Both are written and verified as far as possible without one:
+All four Action Items are done and verified. Real, live results, not projected:
 
-- `scripts/register-agentinsure-eth.mjs` (relocated from the spec's original `scripts/` path to `apps/northbeam/scripts/` — this repo has no root `package.json`/`node_modules` to run a top-level script from, so it lives alongside the `viem` dependency it needs) has been checked against the real, live hackathon contracts: `agentinsure.eth` is confirmed available on the real `ETHRegistrar` right now, and both the registrar and resolver ABIs used were verified by fetching the hackathon deployment's actual verified source from Sourcify (not guessed from generic docs) and cross-checked with live read-only calls against the deployed contracts.
-- `apps/northbeam/e2e/lock-rules.spec.ts` is written, type-checks, and is listed correctly by Playwright, but is `test.skip`ped without `SEPOLIA_PRIVATE_KEY` set — it has not yet been run for real.
+- **Registered:** `agentinsure.eth` on the hackathon's real `ETHRegistrar` — [registration tx](https://sepolia.etherscan.io/tx/0xd11bf9b9ed6f985f2e0cf0f7cdb52ded8a6e2bb3520d81e4932334e8451900a3). Its own dedicated resolver proxy (never the shared implementation) deployed at [`0x54855140Da88F4E824DF1Ee80E1D803Ea52C97eF`](https://sepolia.etherscan.io/address/0x54855140Da88F4E824DF1Ee80E1D803Ea52C97eF) via [this tx](https://sepolia.etherscan.io/tx/0xce33a876a5b0046159438530dd69270dd62be652e35fa9d2dc8d4b0bb4044a3d).
+- **Written and locked:** `apps/northbeam/e2e/lock-rules.spec.ts` passed for real (headed, trace + video captured) — the budget cap and vendor list were written to the resolver's text records, then the write role was revoked via Enhanced Access Control. Independently re-confirmed afterward with a fresh read-only call: `hasAssignees(ROOT_RESOURCE, ROLE_SET_TEXT)` on the deployed resolver now returns `false` — nobody, including the wallet that set it up, can write to it again.
+- `journey.json`'s `g-provision` steps `s-provision-3` (write to ENS) and `s-provision-4` (lock via EAC) are marked `built`, with `testResults` rows extracted mechanically from the passing run's own JSON reporter output — never hand-typed. `s-provision-1`/`s-provision-2` (setting the cap/vendor list interactively) stay `proposed`: this issue's own business rules deliberately don't add editing for either field, so there's nothing there to honestly claim as built.
 
-One wallet plays PayableAgent throughout — no separate "Agent Insure issues to Northbeam" step, since `journey.json`'s steps for this goal are all assigned to a single actor (Northbeam) and nothing in ENS's judging criteria needs a second party. That wallet's key signs the one-time setup script (below) and, separately, the same address connects live via MetaMask for the demo.
+One wallet played PayableAgent throughout — no separate "Agent Insure issues to Northbeam" step, since `journey.json`'s steps for this goal are all assigned to a single actor (Northbeam) and nothing in ENS's judging criteria needs a second party.
 
-Env vars follow this repo's existing split, unchanged: the root `.env.local` is for server/script secrets only (`server/src/index.js` already documents this convention — "Secrets live in the repo-root .env.local, not inside server/"), and `apps/northbeam/.env.local` is for the frontend's own `VITE_`-prefixed, browser-safe values. The registration script and `lock-rules.spec.ts` both load the root file directly via `process.loadEnvFile()`, matching how `server/` loads it.
+Two things worth flagging, found during Build:
 
-To close this gap: add a Sepolia-testnet-only private key (no real value at stake) to the repo root `.env.local` as `SEPOLIA_PRIVATE_KEY` — it drives both the one-time registration script and the e2e proof. Once registration succeeds, its printed `VITE_ENS_RESOLVER_ADDRESS` needs adding to `apps/northbeam/.env.local` (not the root file) before the e2e spec or the live app can do anything. **The Enhanced Access Control lock this issue implements is genuinely permanent** — once `lock-rules.spec.ts` passes for real once, that resolver's write permission is revoked forever; re-running it after that only re-confirms the already-locked state (handled explicitly in the test), it can never re-test the fresh write path against the same name again.
-
-Also worth flagging: Action Item 2's original text assumed reading/writing would go through viem's Universal Resolver override. Building it revealed a simpler path — `payableagent.agentinsure.eth` is a non-tokenized wildcard subname, so `ens.ts` talks directly to the resolver proxy `scripts/register-agentinsure-eth.mjs` deploys (via its own `resolve()`/`setText()`/`revokeRootRoles()`), never through viem's ENS convenience functions at all. That sidesteps the hackathon-vs-production Universal Resolver mismatch entirely rather than needing the override.
+- Action Item 2's original text assumed reading/writing would go through viem's Universal Resolver override. Building it revealed a simpler path — `payableagent.agentinsure.eth` is a non-tokenized wildcard subname, so `ens.ts` talks directly to the resolver proxy `apps/northbeam/scripts/register-agentinsure-eth.mjs` deploys (via its own `resolve()`/`setText()`/`revokeRootRoles()`), never through viem's ENS convenience functions at all — sidestepping the hackathon-vs-production Universal Resolver mismatch entirely.
+- A transaction hash isn't on-chain *state* (it's history, not something the resolver stores) — so unlike the "Locked" state itself, tx hashes shown on the Rules screen only ever reflect the session that performed the write/lock, never a later visit's read-only sync. Reflected in Core Logic and the e2e spec's assertions.

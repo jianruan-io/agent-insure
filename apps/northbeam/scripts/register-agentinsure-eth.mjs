@@ -28,6 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { createPublicClient, createWalletClient, http, parseAbi, encodeFunctionData, decodeEventLog } from 'viem';
 import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
 import { sepolia } from 'viem/chains';
+import { normalizePrivateKey } from './normalize-private-key.mjs';
 
 try {
   process.loadEnvFile(fileURLToPath(new URL('../../../.env.local', import.meta.url)));
@@ -37,7 +38,7 @@ try {
 }
 
 const RPC_URL = process.env.SEPOLIA_RPC_URL ?? 'https://ethereum-sepolia-rpc.publicnode.com';
-const PRIVATE_KEY = process.env.SEPOLIA_PRIVATE_KEY;
+const PRIVATE_KEY = normalizePrivateKey(process.env.SEPOLIA_PRIVATE_KEY);
 const LABEL = 'agentinsure';
 const NAME = `${LABEL}.eth`;
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';

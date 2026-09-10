@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { createWalletClient, createPublicClient, http, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { sepolia } from 'viem/chains';
+import { normalizePrivateKey } from '../scripts/normalize-private-key.mjs';
 
 /**
  * No mocking of the ENS/chain interaction itself — every call this test drives hits the
@@ -23,7 +24,7 @@ try {
   // No root .env.local — the test.skip just below reports this clearly instead.
 }
 
-const TEST_SIGNER_KEY = process.env.SEPOLIA_PRIVATE_KEY as Hex | undefined;
+const TEST_SIGNER_KEY = normalizePrivateKey(process.env.SEPOLIA_PRIVATE_KEY) as Hex | undefined;
 const RPC_URL = process.env.SEPOLIA_RPC_URL ?? 'https://ethereum-sepolia-rpc.publicnode.com';
 
 test.skip(
@@ -67,17 +68,33 @@ async function installTestSigner(page: Page) {
 
 test.describe('AP controller locks PayableAgent’s spending rules on real ENS text records', () => {
   test('the budget cap and vendor list are written and locked on-chain, with real proof shown', async ({ page }) => {
+    // Real Sepolia confirmations (write, then lock) can each take real block time —
+    // well beyond Playwright's 30s default.
+    test.setTimeout(180_000);
+
     await installTestSigner(page);
     await page.goto('/rules');
 
-    const alreadyLocked = await page.getByText('Locked on ENS').isVisible().catch(() => false);
+    // The page's own on-chain read (`syncRulesFromChain`) is async — wait for it to
+    // actually resolve into one of its two possible states before deciding which branch
+    // of this test to take. Checking `isVisible()` immediately races that read and can
+    // click a button that's about to disappear once the real state comes back.
+    const alreadyLocked = await page
+      .getByText('Locked on ENS')
+      .waitFor({ state: 'visible', timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
 
     if (alreadyLocked) {
       // The Enhanced Access Control lock is permanent — a prior real run already revoked
       // this test wallet's write permission. Re-running only re-confirms that fact.
+      //
+      // Only "Locked on ENS" is asserted here, not a tx hash: a transaction hash isn't
+      // on-chain *state*, only a read-only sync can re-derive here — it only ever exists
+      // in the browser session that performed the write/lock, which the fresh-flow branch
+      // below covers.
       await test.step('confirm the already-locked state carries real on-chain proof', async () => {
         await expect(page.getByText('Locked on ENS')).toBeVisible();
-        await expect(page.getByText(/lock tx: 0x/)).toBeVisible();
       });
       return;
     }
