@@ -1,12 +1,22 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { TransferTransaction, Hbar } from '@hiero-ledger/sdk';
 import { getPayableAgentClient, getPayableAgentAccountId, getPayableAgentPrivateKey } from '../hedera/client.js';
 import { chargeCoverageFee } from '../hedera/coverage-fee.js';
 import { logPaymentToHcs } from '../hedera/hcs.js';
 
 const COVERAGE_FEE_AMOUNT = process.env.HEDERA_COVERAGE_FEE_AMOUNT || '10000000'; // 0.1 test HBAR, fixed by design
-const VENDOR_PAYMENT_ASSET = '0.0.0'; // vendor invoices are settled in HBAR, not the x402 fee's USDC
-const CLAUDE_MODEL = 'claude-sonnet-5';
+// The invoice's displayed amount (e.g. 500) is a nominal dollar figure, not literally HBAR —
+// `new Hbar(500)` would mean 500 real HBAR, which would drain the operator's testnet balance
+// in a couple of demo runs. The real on-chain transfer uses this small, fixed test amount
+// instead, same as the coverage fee already does — decoupled from the invoice's face value.
+const VENDOR_TRANSFER_TINYBARS = process.env.HEDERA_VENDOR_PAYMENT_TINYBARS || '100000000'; // 1 test HBAR
+
+/** The normal path's routing — the one vendor already on the locked, approved list. There's
+ *  no real decision to make here (a single pre-approved vendor), so nothing to ask Claude;
+ *  a real AI decision only matters once something is trying to fool it (TECH-608). Pure. */
+export function selectNormalPaymentTarget({ vendor, amount }) {
+  if (!vendor.hederaAccountId) throw new Error('vendor.hederaAccountId is required for the normal path.');
+  return { vendor: vendor.name, accountId: vendor.hederaAccountId, amount };
+}
 
 /** The poisoned path's hardcoded wrong-account routing — real deception is TECH-608's job. Pure. */
 export function selectPoisonedPaymentTarget({ vendor, wrongAccountId, amount }) {
@@ -43,65 +53,26 @@ export function classifyPaymentError(err, stage) {
   return 'unknown';
 }
 
-const MAKE_PAYMENT_TOOL = {
-  name: 'makePayment',
-  description: "Pay a vendor invoice from PayableAgent's Hedera account.",
-  input_schema: {
-    type: 'object',
-    properties: {
-      vendorAccountId: { type: 'string', description: 'The Hedera account id to pay (0.0.xxxxx).' },
-      amount: { type: 'number', description: 'The amount in whole currency units to pay.' },
-    },
-    required: ['vendorAccountId', 'amount'],
-  },
-};
-
-/** PayableAgent's one real Claude call — reads the invoice, decides who gets paid. */
-async function decideNormalPayment({ vendor, amount }) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set.');
-  const client = new Anthropic({ apiKey });
-
-  const response = await client.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: 512,
-    temperature: 0,
-    tools: [MAKE_PAYMENT_TOOL],
-    messages: [
-      {
-        role: 'user',
-        content:
-          `Invoice received from ${vendor.name}, amount $${amount}, requesting payment to Hedera account ` +
-          `${vendor.hederaAccountId}. This vendor's account is already on the locked, approved vendor list. ` +
-          `Use the makePayment tool to pay this invoice.`,
-      },
-    ],
-  });
-
-  const toolUse = response.content.find((block) => block.type === 'tool_use' && block.name === 'makePayment');
-  if (!toolUse) throw new Error('PayableAgent did not decide to make a payment.');
-  return { vendor: vendor.name, accountId: toolUse.input.vendorAccountId, amount: toolUse.input.amount };
-}
-
-async function executeVendorTransfer({ accountId, amount }) {
+async function executeVendorTransfer({ accountId }) {
   const client = getPayableAgentClient();
+  const tinybars = VENDOR_TRANSFER_TINYBARS;
   const tx = new TransferTransaction()
-    .addHbarTransfer(getPayableAgentAccountId(), new Hbar(-amount))
-    .addHbarTransfer(accountId, new Hbar(amount));
+    .addHbarTransfer(getPayableAgentAccountId(), Hbar.fromTinybars(`-${tinybars}`))
+    .addHbarTransfer(accountId, Hbar.fromTinybars(tinybars));
   const submitted = await tx.execute(client);
   return submitted.getReceipt(client).then((receipt) => ({ ...receipt, transactionId: submitted.transactionId }));
 }
 
 /**
- * Orchestrates one real payment: decide (or, for the poisoned path, use the
- * hardcoded wrong target) → charge the coverage fee for real → execute the real
- * vendor transfer → log both to HCS → return the real resulting row.
+ * Orchestrates one real payment: pick the target (the vendor's real account, or for the
+ * poisoned path, the hardcoded wrong one) → charge the coverage fee for real → execute
+ * the real vendor transfer → log both to HCS → return the real resulting row.
  */
 async function simulatePayment({ kind, vendor, amount, wrongAccountId }) {
   const target =
     kind === 'poisoned'
       ? selectPoisonedPaymentTarget({ vendor, wrongAccountId, amount })
-      : await decideNormalPayment({ vendor, amount });
+      : selectNormalPaymentTarget({ vendor, amount });
 
   let feeReceipt;
   try {
@@ -117,7 +88,7 @@ async function simulatePayment({ kind, vendor, amount, wrongAccountId }) {
 
   let paymentReceipt;
   try {
-    paymentReceipt = await executeVendorTransfer({ accountId: target.accountId, amount: target.amount });
+    paymentReceipt = await executeVendorTransfer({ accountId: target.accountId });
   } catch (err) {
     throw Object.assign(new Error(err.message), { stage: 'payment' });
   }

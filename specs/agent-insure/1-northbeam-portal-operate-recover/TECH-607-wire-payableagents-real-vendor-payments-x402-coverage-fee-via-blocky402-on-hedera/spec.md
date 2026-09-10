@@ -3,13 +3,13 @@
 ## Overview
 
 **What:**
-When PayableAgent pays a vendor invoice, that payment becomes a real, independently-verifiable Hedera transaction — a real Claude call decides who gets paid, a real per-payment coverage fee is charged and settled before the money moves, and both the fee and the vendor payment are permanently logged where anyone can check them.
+When PayableAgent pays a vendor invoice, that payment becomes a real, independently-verifiable Hedera transaction — a real per-payment coverage fee is charged and settled before the money moves, and both the fee and the vendor payment are permanently logged where anyone can check them.
 
 **Why:**
-Today the Activity Feed is theater — clicking "Simulate normal invoice" just appends a hardcoded row with a made-up $500 and a fake "$0.02 Hedera" fee badge; nothing was decided, nothing was paid, nothing exists outside the browser tab. Worse, the investigation step this whole story depends on later — "every prior payment went to account X, this one is new" — has no real history to compare against if the prior payments were never real to begin with.
+Today the Activity Feed is theater — clicking "Simulate normal invoice" just appends a hardcoded row with a made-up $500 and a fake "$0.02 Hedera" fee badge; nothing was paid, nothing exists outside the browser tab. Worse, the investigation step this whole story depends on later — "every prior payment went to account X, this one is new" — has no real history to compare against if the prior payments were never real to begin with. A real AI decision only matters once something is trying to fool it — that's the later, distinct capability in TECH-608, not this one.
 
 **How:**
-PayableAgent makes one real Claude call with a payment tool to decide the vendor and amount; before the payment can go through, a small coverage fee is automatically charged and settled through Hedera's x402 payment protocol; the vendor payment itself executes as a real Hedera transaction; both are permanently logged to Hedera Consensus Service, and the Activity Feed reads the real result instead of inventing one.
+PayableAgent pays the one vendor already on its own locked, approved list, at its real account; before the payment can go through, a small coverage fee is automatically charged and settled through Hedera's x402 payment protocol; the vendor payment itself executes as a real Hedera transaction; both are permanently logged to Hedera Consensus Service, and the Activity Feed reads the real result instead of inventing one.
 
 **Zone 1 check:**
 Implementation. This moves vendor payments from a Design-stage mock (a client-side row with invented numbers) to a real, independently-verifiable Hedera transaction history — the actual evidence the insurer's InvestigatorAgent will later query to judge a disputed payment, not a story about one.
@@ -21,9 +21,9 @@ Implementation. This moves vendor payments from a Design-stage mock (a client-si
 ```mermaid
 flowchart TD
     START(["AP controller clicks<br/>Simulate normal invoice / Simulate poisoned invoice"]) --> DECIDE{"Which button?"}
-    DECIDE -- "normal" --> CLAUDE["Real Claude call, one tool (makePayment):<br/>reads the invoice, decides vendor + amount + account"]
+    DECIDE -- "normal" --> REAL["The vendor's own real,<br/>locked account (no AI decision needed —<br/>see TECH-608 for when one is)"]
     DECIDE -- "poisoned" --> FIXED["Same vendor + amount,<br/>but a hardcoded wrong account<br/>(real deception is TECH-608 — not built here)"]
-    CLAUDE --> CHARGE
+    REAL --> CHARGE
     FIXED --> CHARGE
     CHARGE["Coverage-fee endpoint called —<br/>no payment yet, so it returns HTTP 402<br/>with Blocky402's payment requirements"]
     CHARGE --> PAYFEE["PayableAgent signs a real Hedera<br/>USDC transfer to Agent Insure's reserve pool,<br/>retries with the payment proof"]
@@ -37,9 +37,9 @@ flowchart TD
 
 ### Business rules
 
-- The coverage fee is charged automatically, every time, before any vendor payment can execute — it is never something Claude decides whether to pay; it is enforced by the endpoint itself refusing to proceed without it (HTTP 402).
+- The coverage fee is charged automatically, every time, before any vendor payment can execute — it is enforced by the endpoint itself refusing to proceed without it (HTTP 402), never something either path chooses whether to pay.
 - An Activity row only ever reflects what Hedera actually confirmed — the amount, the fee, and both transaction hashes come from the real transaction receipts, never invented client-side.
-- The "poisoned invoice" button in this issue pays a hardcoded wrong account through the exact same real payment pipeline as the normal button — it does not yet involve a real deceived Claude call. That's a distinct, later capability (TECH-608), not a gap in this issue's own honesty.
+- Neither button in this issue involves a real AI decision — the normal button pays the one vendor already on the locked, approved list at its real account; the poisoned button pays a hardcoded wrong account through the exact same real payment pipeline. A real AI agent making (and being fooled into making) that decision is a distinct, later capability (TECH-608), not a gap in this issue's own honesty.
 - A failure between charging the fee and paying the vendor is a real, distinct, visible state — never silently treated as either a full success or a full no-op, since the fee has genuinely already moved.
 
 ---
@@ -48,7 +48,7 @@ flowchart TD
 
 ```
 server/
-  package.json                          # modified — add @x402/core, @x402/hedera, @hiero-ledger/sdk, @anthropic-ai/sdk
+  package.json                          # modified — add @x402/core, @x402/hedera, @hiero-ledger/sdk
   scripts/
     setup-hedera.mjs                    # new — one-time script: creates the reserve-pool and vendor Hedera accounts, creates the HCS topic. Run once by hand — not part of the live demo flow.
   src/
@@ -57,9 +57,9 @@ server/
       hcs.js                            # new — submits a JSON message to the HCS topic
       coverage-fee.js                   # new — the x402-gated coverage-fee charge: issues the 402 challenge, and (as PayableAgent) pays and retries when called to actually charge
     routes/
-      activity.js                       # new — POST /api/activity/simulate: orchestrates the real Claude call (or hardcoded wrong-account for the poisoned case), the coverage-fee charge, the real vendor transfer, and HCS logging
+      activity.js                       # new — POST /api/activity/simulate: orchestrates the vendor's real account (or hardcoded wrong-account for the poisoned case), the coverage-fee charge, the real vendor transfer, and HCS logging
     index.js                            # modified — registers the new activity routes
-.env.example                            # modified — document ANTHROPIC_API_KEY, HEDERA_RESERVE_POOL_ACCOUNT_ID(+KEY), HEDERA_VENDOR_ACCOUNT_ID, HEDERA_HCS_TOPIC_ID, BLOCKY402_FACILITATOR_URL
+.env.example                            # modified — document HEDERA_RESERVE_POOL_ACCOUNT_ID(+KEY), HEDERA_VENDOR_ACCOUNT_ID, HEDERA_HCS_TOPIC_ID, BLOCKY402_FACILITATOR_URL
 apps/business/
   src/
     lib/
@@ -94,9 +94,9 @@ npm run build --prefix server 2>/dev/null || node --check server/src/hedera/clie
 ```
 → exits 0, no syntax/type errors
 
-**[ ] Wire the real payment orchestration endpoint**
+**[x] Wire the real payment orchestration endpoint** — verified live: both `{"kind":"normal"}` (real vendor account `0.0.10463415`) and `{"kind":"poisoned"}` (hardcoded wrong account `0.0.10463414`) return real `feeTxHash`/`paymentTxHash`/`hcsSequenceNumber`.
 
-Implement: Create `server/src/routes/activity.js` exporting `registerActivityRoutes(app)`, mounting `POST /api/activity/simulate`. For `{kind: "normal"}`: makes one real Claude call (`@anthropic-ai/sdk`) with a single `makePayment` tool, given the invoice and the locked vendor list, and executes whatever account/amount it decides. For `{kind: "poisoned"}`: uses the same vendor and amount but a hardcoded different account (no Claude call). Both paths: charge the coverage fee for real, execute the real vendor transfer, log both to HCS, and return the real resulting activity row (amount, fee, both tx hashes). Register from `server/src/index.js`.
+Implement: Create `server/src/routes/activity.js` exporting `registerActivityRoutes(app)`, mounting `POST /api/activity/simulate`. For `{kind: "normal"}`: pays the one vendor already on the locked, approved list at its real Hedera account. For `{kind: "poisoned"}`: uses the same vendor and amount but a hardcoded different account. Both paths: charge the coverage fee for real, execute the real vendor transfer, log both to HCS, and return the real resulting activity row (amount, fee, both tx hashes). Register from `server/src/index.js`.
 
 Verify:
 ```

@@ -1,10 +1,26 @@
 import { describe, it, expect } from 'vitest';
 
-const { selectPoisonedPaymentTarget, buildActivityRow, classifyPaymentError } = await import('../activity.js');
+const { selectNormalPaymentTarget, selectPoisonedPaymentTarget, buildActivityRow, classifyPaymentError } =
+  await import('../activity.js');
 
 function buildVendor(overrides = {}) {
   return { name: 'Acme Corp', hederaAccountId: '0.0.7000002', ...overrides };
 }
+
+describe('selectNormalPaymentTarget', () => {
+  it("routes to the vendor's own real, locked account", () => {
+    const vendor = buildVendor();
+    const target = selectNormalPaymentTarget({ vendor, amount: 500 });
+
+    expect(target.vendor).toBe('Acme Corp');
+    expect(target.accountId).toBe('0.0.7000002');
+    expect(target.amount).toBe(500);
+  });
+
+  it('raises rather than routing to a blank account', () => {
+    expect(() => selectNormalPaymentTarget({ vendor: buildVendor({ hederaAccountId: undefined }), amount: 500 })).toThrow();
+  });
+});
 
 describe('selectPoisonedPaymentTarget', () => {
   it('routes to the configured wrong account, never the vendor\'s own locked account', () => {
