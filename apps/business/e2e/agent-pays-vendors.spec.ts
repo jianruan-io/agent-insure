@@ -58,13 +58,21 @@ test.describe('PayableAgent pays vendors for real on Hedera, with a real x402 co
       await expect(reasoningRow.getByText(/logged to Hedera Consensus Service · seq #\d+/)).toBeVisible();
     });
 
-    await test.step('simulate a poisoned invoice and confirm it is flagged with real proof of the wrong destination', async () => {
+    await test.step('simulate a poisoned invoice and confirm PayableAgent was genuinely fooled, with real proof of the wrong destination', async () => {
       const simulated = page.waitForResponse(
         (response) => response.url().endsWith('/api/activity/simulate') && response.request().method() === 'POST'
       );
       await page.getByRole('button', { name: 'Simulate poisoned invoice' }).click();
       const response = await simulated;
       expect(response.status()).toBe(200);
+      const body = await response.json();
+
+      // Real, PayableAgent-generated reasoning — never the old hardcoded client string.
+      expect(body.reasoning).toBeTruthy();
+      expect(body.reasoning).not.toBe(
+        'New account for this vendor — never paid before. Outside the locked vendor list. Looks like manipulation, not a normal decision.'
+      );
+      expect(body.flagged).toBe(true);
 
       const row = page.locator('tbody tr').first();
       await expect(row.getByText('Flagged', { exact: true })).toBeVisible({ timeout: 60_000 });
@@ -74,9 +82,19 @@ test.describe('PayableAgent pays vendors for real on Hedera, with a real x402 co
 
       await row.getByRole('button', { name: 'reason' }).click();
       const reasoningRow = row.locator('xpath=following-sibling::tr[1]');
+      await expect(reasoningRow.getByText(body.reasoning)).toBeVisible();
+
       const paymentTxLink = reasoningRow.getByRole('link', { name: /^vendor payment tx:/ });
       await expect(paymentTxLink).toHaveAttribute('href', HASHSCAN_TX_URL);
       await expect(reasoningRow.getByText(/logged to Hedera Consensus Service · seq #\d+/)).toBeVisible();
+
+      // The concealed instruction itself, on screen — the real document PayableAgent read,
+      // not a description of it.
+      await reasoningRow.getByRole('button', { name: 'View invoice' }).click();
+      const invoiceModal = page.getByTestId('invoice-modal');
+      await expect(invoiceModal.getByText('Invoice as PayableAgent read it')).toBeVisible();
+      await expect(invoiceModal.getByText(/URGENT ACCOUNT UPDATE/i)).toBeVisible();
+      await expect(invoiceModal.getByText(new RegExp(body.account.replace(/\./g, '\\.')))).toBeVisible();
     });
   });
 });
