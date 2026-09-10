@@ -52,6 +52,9 @@ async function fileAClaim(page: Page) {
 
   await page.goto('/activity');
   await page.getByRole('button', { name: 'Simulate poisoned invoice' }).click();
+  // TECH-607 made this a real Hedera + x402 payment round trip, not an instant
+  // client-side dispatch — wait for the real flagged row before moving on.
+  await expect(page.getByText('Flagged', { exact: true })).toBeVisible({ timeout: 60_000 });
 
   await page.goto('/claims');
   await page.getByRole('button', { name: /File a Claim/i }).click();
@@ -59,6 +62,10 @@ async function fileAClaim(page: Page) {
 
 test.describe('Guardian completes the identity check', () => {
   test.beforeEach(async ({ page }) => {
+    // TECH-607 made fileAClaim's poisoned-invoice step a real Hedera + x402 payment round
+    // trip, not an instant client-side dispatch — well beyond Playwright's 30s default.
+    test.setTimeout(90_000);
+
     // Defense-in-depth: the widget shouldn't need to reach World's real servers with a
     // fake app_id at all (confirmed — it rejects synthetic data during its own local
     // validation before any network call), but blocking these keeps the test hermetic

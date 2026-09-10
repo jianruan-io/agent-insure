@@ -114,7 +114,7 @@ npm run build --prefix apps/business
 ```
 → exits 0, no type errors
 
-**[ ] Prove it end-to-end against the real chain**
+**[x] Prove it end-to-end against the real chain**
 
 Implement: Add `apps/business/e2e/agent-pays-vendors.spec.ts` — a real, headed Playwright test that clicks both "Simulate normal invoice" and "Simulate poisoned invoice" against the real running server and real Hedera testnet, asserting the UI ends on real transaction hashes for both.
 
