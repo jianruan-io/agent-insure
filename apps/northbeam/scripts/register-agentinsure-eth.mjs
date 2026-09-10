@@ -11,16 +11,27 @@
 // keeps our records and permissions ours alone.
 //
 // Not part of the live demo — run once, by hand, before using the app's "Lock Rules
-// On-Chain" button:
+// On-Chain" button, from the repo root:
 //
-//   node --env-file=apps/northbeam/.env.local apps/northbeam/scripts/register-agentinsure-eth.mjs
+//   node apps/northbeam/scripts/register-agentinsure-eth.mjs
+//
+// Reads the one consolidated root .env.local (see .env.example) — same file the server
+// and the apps/northbeam frontend (via its vite.config.ts envDir) both read from.
 //
 // Idempotent: re-running after a successful registration reports "already registered,
 // skipping" and exits 0 — it never re-registers or re-deploys.
 
+import { fileURLToPath } from 'node:url';
 import { createPublicClient, createWalletClient, http, parseAbi, encodeFunctionData, decodeEventLog } from 'viem';
 import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
 import { sepolia } from 'viem/chains';
+
+try {
+  process.loadEnvFile(fileURLToPath(new URL('../../../.env.local', import.meta.url)));
+} catch {
+  // No root .env.local yet — the SEPOLIA_PRIVATE_KEY check just below gives a clear
+  // message either way, so a missing file here isn't its own separate failure.
+}
 
 const RPC_URL = process.env.SEPOLIA_RPC_URL ?? 'https://ethereum-sepolia-rpc.publicnode.com';
 const PRIVATE_KEY = process.env.SEPOLIA_PRIVATE_KEY;
@@ -40,8 +51,9 @@ const MOCK_USDC_ADDRESS = process.env.ENS_MOCK_USDC_ADDRESS ?? '0xcbfd80f74375c5
 
 if (!PRIVATE_KEY) {
   console.error(
-    'SEPOLIA_PRIVATE_KEY is not set. Add it to apps/northbeam/.env.local (gitignored) — ' +
-      'this is the one-time, off-camera setup wallet, never used in the live demo.'
+    'SEPOLIA_PRIVATE_KEY is not set. Add it to the repo root .env.local (gitignored) — ' +
+      'the same wallet later connects live via MetaMask for the demo, but this key only ' +
+      'ever runs here, in this one-time setup script.'
   );
   process.exit(1);
 }
@@ -92,7 +104,7 @@ async function main() {
 
   if (!available) {
     console.log(`${NAME} is already registered — skipping.`);
-    console.log('If VITE_ENS_RESOLVER_ADDRESS is not yet set in apps/northbeam/.env.local, look up the');
+    console.log('If VITE_ENS_RESOLVER_ADDRESS is not yet set in the repo root .env.local, look up the');
     console.log(`resolver this name currently points to via the ENS Explorer for ${NAME}.`);
     return;
   }
@@ -188,7 +200,7 @@ async function main() {
   console.log('');
   console.log(`${NAME} registered. tx: ${registerHash}`);
   console.log('');
-  console.log('Add these to apps/northbeam/.env.local:');
+  console.log('Add this to the repo root .env.local:');
   console.log(`  VITE_ENS_RESOLVER_ADDRESS=${resolverAddress}`);
   console.log(`  VITE_ENS_AGENT_NAME=payableagent.${NAME}`);
 }

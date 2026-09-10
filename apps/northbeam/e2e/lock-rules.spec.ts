@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
 import { createWalletClient, createPublicClient, http, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { sepolia } from 'viem/chains';
@@ -8,19 +9,26 @@ import { sepolia } from 'viem/chains';
  * real hackathon ENSv2 Sepolia deployment for real, through the real `ens.ts` client the
  * app ships with. The one substitution: Playwright cannot click a real MetaMask extension
  * popup, so `window.ethereum` is replaced with a thin shim that forwards every request to
- * a real viem wallet client running in this test's own Node process, holding a real Sepolia
- * private key (`SEPOLIA_TEST_SIGNER_KEY`). Every signature, transaction, and confirmation
- * that flows through it is real — this only substitutes for the human clicking "Confirm" in
- * a wallet UI, the same category of thing `selfie-check.spec.ts` documents for a physical
- * device Playwright can't drive either. Added 2026-09-09 for TECH-606.
+ * a real viem wallet client running in this test's own Node process, holding the same
+ * `SEPOLIA_PRIVATE_KEY` PayableAgent's wallet uses live (root `.env.local`). Every
+ * signature, transaction, and confirmation that flows through it is real — this only
+ * substitutes for the human clicking "Confirm" in a wallet UI, the same category of thing
+ * `selfie-check.spec.ts` documents for a physical device Playwright can't drive either.
+ * Added 2026-09-09 for TECH-606.
  */
 
-const TEST_SIGNER_KEY = process.env.SEPOLIA_TEST_SIGNER_KEY as Hex | undefined;
+try {
+  process.loadEnvFile(fileURLToPath(new URL('../../../.env.local', import.meta.url)));
+} catch {
+  // No root .env.local — the test.skip just below reports this clearly instead.
+}
+
+const TEST_SIGNER_KEY = process.env.SEPOLIA_PRIVATE_KEY as Hex | undefined;
 const RPC_URL = process.env.SEPOLIA_RPC_URL ?? 'https://ethereum-sepolia-rpc.publicnode.com';
 
 test.skip(
   !TEST_SIGNER_KEY,
-  'SEPOLIA_TEST_SIGNER_KEY is not set — this test drives real Sepolia transactions and needs a funded test wallet. See this file’s header comment.'
+  'SEPOLIA_PRIVATE_KEY is not set in the repo root .env.local — this test drives real Sepolia transactions and needs a funded test wallet. See this file’s header comment.'
 );
 
 async function installTestSigner(page: Page) {
