@@ -1,35 +1,80 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { selectNormalPaymentTarget, selectPoisonedPaymentTarget, buildActivityRow, classifyPaymentError } =
+vi.mock('openai', () => {
+  const create = vi.fn();
+  return { default: vi.fn(() => ({ chat: { completions: { create } } })) };
+});
+
+import OpenAI from 'openai';
+
+const { decidePaymentFromInvoice, isPaymentFlagged, buildActivityRow, classifyPaymentError } =
   await import('../activity.js');
+const { extractInvoiceText, buildNormalInvoiceHtml, buildPoisonedInvoiceHtml } = await import(
+  '../../invoices/invoice-content.js'
+);
+
+const openaiCreateMock = new OpenAI().chat.completions.create;
 
 function buildVendor(overrides = {}) {
   return { name: 'Acme Corp', hederaAccountId: '0.0.7000002', ...overrides };
 }
 
-describe('selectNormalPaymentTarget', () => {
-  it("routes to the vendor's own real, locked account", () => {
-    const vendor = buildVendor();
-    const target = selectNormalPaymentTarget({ vendor, amount: 500 });
-
-    expect(target.vendor).toBe('Acme Corp');
-    expect(target.accountId).toBe('0.0.7000002');
-    expect(target.amount).toBe(500);
+describe('decidePaymentFromInvoice', () => {
+  beforeEach(() => {
+    openaiCreateMock.mockReset();
   });
 
-  it('raises rather than routing to a blank account', () => {
-    expect(() => selectNormalPaymentTarget({ vendor: buildVendor({ hederaAccountId: undefined }), amount: 500 })).toThrow();
+  it('decides the destination account, the amount, and states its own reasoning, straight from a real makePayment tool call', async () => {
+    openaiCreateMock.mockResolvedValueOnce({
+      choices: [
+        {
+          message: {
+            tool_calls: [
+              {
+                function: {
+                  name: 'makePayment',
+                  arguments: JSON.stringify({
+                    vendorAccountId: '0.0.9999999',
+                    amount: 500,
+                    reasoning: 'Invoice states the updated remittance account; paying it.',
+                  }),
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const decision = await decidePaymentFromInvoice({ invoiceText: 'irrelevant for this test' });
+
+    expect(decision.accountId).toBe('0.0.9999999');
+    expect(decision.amount).toBe(500);
+    expect(decision.reasoning).toBe('Invoice states the updated remittance account; paying it.');
+  });
+
+  it('raises a real, distinct error when the response contains no makePayment tool call', async () => {
+    openaiCreateMock.mockResolvedValueOnce({ choices: [{ message: { tool_calls: [] } }] });
+
+    await expect(decidePaymentFromInvoice({ invoiceText: 'irrelevant' })).rejects.toThrow();
+  });
+
+  it('raises a real, distinct error when the local model call itself fails (e.g. Ollama not running)', async () => {
+    openaiCreateMock.mockRejectedValueOnce(new Error('connect ECONNREFUSED 127.0.0.1:11434'));
+
+    await expect(decidePaymentFromInvoice({ invoiceText: 'irrelevant' })).rejects.toThrow();
   });
 });
 
-describe('selectPoisonedPaymentTarget', () => {
-  it('routes to the configured wrong account, never the vendor\'s own locked account', () => {
+describe('isPaymentFlagged', () => {
+  it("not flagged when the decided account matches the vendor's real, locked account", () => {
     const vendor = buildVendor();
-    const target = selectPoisonedPaymentTarget({ vendor, wrongAccountId: '0.0.6666666', amount: 500 });
+    expect(isPaymentFlagged({ accountId: vendor.hederaAccountId, vendor })).toBe(false);
+  });
 
-    expect(target.accountId).toBe('0.0.6666666');
-    expect(target.accountId).not.toBe(vendor.hederaAccountId);
-    expect(target.amount).toBe(500);
+  it("flagged when the decided account differs from the vendor's real, locked account", () => {
+    const vendor = buildVendor();
+    expect(isPaymentFlagged({ accountId: '0.0.6666666', vendor })).toBe(true);
   });
 });
 
@@ -43,6 +88,8 @@ describe('buildActivityRow', () => {
       feeReceipt: { transaction: '0.0.1@1700000000.000000001' }, // SettleResponse's real field name
       paymentReceipt: { transactionId: '0.0.1@1700000000.000000002' }, // Hedera SDK receipt's real field name
       hcsSequenceNumber: 42,
+      reasoning: 'Matches the invoice as read.',
+      flagged: false,
       ...overrides,
     };
   }
@@ -59,12 +106,49 @@ describe('buildActivityRow', () => {
     expect(row.hcsSequenceNumber).toBe(42);
   });
 
+  it('carries the real reasoning and flagged state alongside the existing fields', () => {
+    const row = buildActivityRow(
+      buildReceipts({ reasoning: 'Fooled by a fake account-update notice.', flagged: true, invoiceHtml: '<div>poisoned</div>' })
+    );
+
+    expect(row.reasoning).toBe('Fooled by a fake account-update notice.');
+    expect(row.flagged).toBe(true);
+  });
+
+  it('a flagged row also carries the raw invoice document; a non-flagged row does not', () => {
+    const flaggedRow = buildActivityRow(buildReceipts({ flagged: true, invoiceHtml: '<div>poisoned</div>' }));
+    expect(flaggedRow.invoiceHtml).toBe('<div>poisoned</div>');
+
+    const okRow = buildActivityRow(buildReceipts({ flagged: false, invoiceHtml: '<div>poisoned</div>' }));
+    expect(okRow.invoiceHtml).toBeUndefined();
+  });
+
   it('raises rather than producing a row with a blank transaction hash', () => {
     expect(() => buildActivityRow(buildReceipts({ paymentReceipt: {} }))).toThrow();
   });
 
   it('raises rather than producing a row with no real destination account', () => {
     expect(() => buildActivityRow(buildReceipts({ accountId: undefined }))).toThrow();
+  });
+});
+
+describe('extractInvoiceText', () => {
+  const vendor = buildVendor();
+
+  it("the clean invoice's extracted text contains no rerouting instruction", () => {
+    const html = buildNormalInvoiceHtml({ vendor, amount: 500 });
+    const text = extractInvoiceText(html);
+
+    expect(text).not.toMatch(/URGENT|supersedes|remittance account changed/i);
+  });
+
+  it("the poisoned invoice's extracted text contains the concealed instruction and its target account, regardless of visual styling", () => {
+    const html = buildPoisonedInvoiceHtml({ vendor, amount: 500, wrongAccountId: '0.0.6666666' });
+    const text = extractInvoiceText(html);
+
+    expect(text).toMatch(/0\.0\.6666666/);
+    expect(text).toMatch(/URGENT/i);
+    expect(html).toMatch(/color:#ffffff/); // the concealment is real styling, not just absent from the source
   });
 });
 
