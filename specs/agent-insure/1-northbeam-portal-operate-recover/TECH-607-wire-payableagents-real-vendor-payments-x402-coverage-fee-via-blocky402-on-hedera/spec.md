@@ -74,7 +74,7 @@ apps/business/
 
 ## Action Items
 
-**[ ] One-time Hedera setup: two new accounts + the HCS topic**
+**[x] One-time Hedera setup: two new accounts + the HCS topic**
 
 Implement: Create `server/scripts/setup-hedera.mjs` — using the already-provisioned `HEDERA_OPERATOR_ACCOUNT_ID`/`HEDERA_OPERATOR_PRIVATE_KEY`, creates two new Hedera testnet accounts (the reserve pool, the vendor) funded with enough test HBAR/USDC to be usable, and creates one HCS topic for payment logging. Idempotent — safe to re-run. Prints the new account IDs, the vendor account's private key is discarded (never needed), the reserve pool's private key and the topic ID are printed to add to `.env.local`.
 

@@ -47,7 +47,9 @@ if (process.env.HEDERA_RESERVE_POOL_ACCOUNT_ID && process.env.HEDERA_VENDOR_ACCO
 }
 
 const client = Client.forTestnet();
-client.setOperator(OPERATOR_ACCOUNT_ID, PrivateKey.fromString(OPERATOR_PRIVATE_KEY));
+// fromString() can't reliably tell ECDSA from ED25519 apart for a plain hex key — this
+// account's real type was confirmed ECDSA_SECP256K1 via the public mirror node, not guessed.
+client.setOperator(OPERATOR_ACCOUNT_ID, PrivateKey.fromStringECDSA(OPERATOR_PRIVATE_KEY));
 
 async function createAccount(memo) {
   const newKey = PrivateKey.generateECDSA();
