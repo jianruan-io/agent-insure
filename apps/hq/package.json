@@ -1,5 +1,5 @@
 {
-  "name": "agent-insure-hq",
+  "name": "hq",
   "private": true,
   "type": "module",
   "scripts": {

@@ -112,4 +112,17 @@ npm run build --prefix apps/northbeam && npx vitest run --root apps/northbeam &&
 
 All four Action Items verified. Beyond the grep/build/test checks above, both apps were actually run and screenshotted: Agent Insure HQ's own sidebar and browser tab read "Agent Insure / INSURER" (not Fidelis), and Northbeam's Overview page — one of the three places that names the insurer from the customer's side — correctly reads "...the reserve pool the payout is drawn from at Agent Insure."
 
-One pre-existing issue noticed but out of scope here: `apps/agent-insure-hq/package.json`'s dev/preview scripts hardcode port 6323, the same port Northbeam's dev server uses — a collision that predates this rename. Not touched, since it's not something this spec's Action Items named.
+One pre-existing issue noticed but out of scope here: `apps/hq/package.json`'s dev/preview scripts hardcode port 6323, the same port the business app's dev server uses — a collision that predates this rename. Not touched, since it's not something this spec's Action Items named.
+
+---
+
+## Further refined, before PR — app directories renamed generically by role
+
+The Action Items above describe (and were verified against) the first pass: `apps/fidelis` → `apps/agent-insure-hq`. Continued conversation with the human, still before this PR opened, landed on a sharper principle: a brand name is demo *data* ("Northbeam Distributors" and "Agent Insure" are both just today's one hardcoded company per side — neither app is actually multi-tenant), not the identity of the app itself. Applied consistently to both sides:
+
+- `apps/agent-insure-hq` → **`apps/hq`** (package name `hq`)
+- `apps/northbeam` → **`apps/business`** (package name `business`; localStorage key `agent-insure-northbeam-v1` → `agent-insure-business-v1`; the one-time ENS registration script's own path comments updated to match)
+
+Brand text is untouched by this second pass — the sidebar in `apps/hq` still says "Agent Insure," the business app still displays "Northbeam Distributors," `journey.json`'s actor id/name stay `northbeam`/"Northbeam Distributors," and `DESIGN.northbeam.md` keeps its filename (it documents that specific brand's visual identity, not the app's code structure). Only the directory names, package names, and the one internal storage key changed.
+
+Re-verified after this second pass: `apps/hq` builds; `apps/business` builds, its 12 unit tests pass, and all three e2e suites pass (`claim-filing`, `selfie-check` for real; `lock-rules` skips in this worktree — no `SEPOLIA_PRIVATE_KEY` here, same as before, not a regression).

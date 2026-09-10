@@ -65,7 +65,7 @@ export interface StoreState {
   nextActId: number;
 }
 
-const STORAGE_KEY = 'agent-insure-northbeam-v1';
+const STORAGE_KEY = 'agent-insure-business-v1';
 
 // Both Northbeam and Agent Insure HQ run on localhost during the hackathon — see SelfieModal.tsx.
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8787';
