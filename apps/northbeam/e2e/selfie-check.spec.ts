@@ -23,6 +23,24 @@ const VALID_REQUEST_RESPONSE = {
   },
 };
 
+const STORAGE_KEY = 'agent-insure-northbeam-v1';
+
+/**
+ * Seeds `rules.locked` directly in localStorage instead of driving the real ENS
+ * write-then-lock flow through the UI — this test's Goal is the identity check, not the
+ * ENS lock itself, which TECH-606's `lock-rules.spec.ts` proves for real with no mocking
+ * of the chain interaction.
+ */
+async function lockRulesForTest(page: Page) {
+  await page.goto('/rules'); // first load seeds localStorage via the store's own seedState()
+  await page.evaluate((key) => {
+    const raw = JSON.parse(localStorage.getItem(key) ?? '{}');
+    raw.rules = { ...raw.rules, locked: true };
+    localStorage.setItem(key, JSON.stringify(raw));
+  }, STORAGE_KEY);
+  await page.reload();
+}
+
 /**
  * Drives a fresh claim into "awaiting identity" — lock the rules, simulate the poisoned
  * invoice, file the claim — the same three steps a person would take before ever seeing
@@ -30,8 +48,7 @@ const VALID_REQUEST_RESPONSE = {
  * localStorage), so this always starts from the seed state.
  */
 async function fileAClaim(page: Page) {
-  await page.goto('/rules');
-  await page.getByRole('button', { name: 'Lock Rules On-Chain' }).click();
+  await lockRulesForTest(page);
 
   await page.goto('/activity');
   await page.getByRole('button', { name: 'Simulate poisoned invoice' }).click();

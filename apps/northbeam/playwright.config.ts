@@ -3,12 +3,13 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
-  // Trace and video are always captured, headed always — per explicit instruction,
-  // not just on retry/failure, so every run leaves behind something a person can watch.
+  // Trace always captured, headed always — per explicit instruction, not just on
+  // retry/failure. Video deliberately off (2026-09-10): trace.zip (DOM/network/console
+  // replay via `npx playwright show-trace`) is preferred over a .webm recording.
   use: {
     baseURL: 'http://localhost:6323',
     trace: 'on',
-    video: 'on',
+    video: 'off',
   },
   headless: false,
   webServer: [
