@@ -5,7 +5,7 @@ import { cn } from '../../lib/utils';
 /**
  * Status and sponsor-touchpoint pill. `neutral`/`success`/`warning`/`destructive` cover
  * app-native states (Approved, OK, Pending, Flagged); `hedera`/`ens`/`world` are the three
- * fixed sponsor tags from DESIGN.northbeam.md — shared with Fidelis and never recolored to
+ * fixed sponsor tags from DESIGN.northbeam.md — shared with Agent Insure HQ and never recolored to
  * Northbeam's own teal accent.
  */
 const badgeVariants = cva(

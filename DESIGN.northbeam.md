@@ -194,7 +194,7 @@ Northbeam is the insured company's own app — a wholesale distributor's account
 - Full rounding carried over from Airbnb's scale — cards, buttons, and badges are all pill-adjacent, nothing sharp
 - Soft, low-opacity shadow only (`{components.card}`), never a hard border-and-drop-shadow combo
 - Dashboard-dense content (stat tiles, tables, status badges) inside airy macro spacing — tight micro, loose macro, same as Airbnb
-- Sponsor tags (`{colors.hedera}`, `{colors.ens}`, `{colors.world}`) are fixed across both Northbeam and Fidelis and never restyled to match the app's own accent — they identify a sponsor touchpoint, not the brand
+- Sponsor tags (`{colors.hedera}`, `{colors.ens}`, `{colors.world}`) are fixed across both Northbeam and Agent Insure and never restyled to match the app's own accent — they identify a sponsor touchpoint, not the brand
 - Full light/dark support (`colors-dark`) — a deliberate departure from Airbnb's light-only system, since this is a tool people may run at any hour
 
 ## Colors
@@ -215,7 +215,7 @@ Northbeam's palette stays as neutral as Airbnb's — white/near-black ink, cool 
 - **Body** (`{colors.body}` — #5A6270): secondary text, captions, muted labels.
 - **Hairline** (`{colors.hairline}` — #D8DEE6): the universal 1px border.
 
-### Sponsor Tags (shared, fixed — see Fidelis doc for the identical values)
+### Sponsor Tags (shared, fixed — see Agent Insure HQ doc for the identical values)
 - **Hedera** (`{colors.hedera}` — #7C5CFF on `{colors.hedera-fill}` #F1EDFF)
 - **ENS** (`{colors.ens}` — #4C82FB on `{colors.ens-fill}` #EAF1FF)
 - **World** (`{colors.world}` — #E0A825 on `{colors.world-fill}` #FFF6E0)
@@ -260,7 +260,7 @@ Identical to Airbnb's radius scale — `{rounded.sm}` 4px through `{rounded.full
 - Keep every corner rounded, per the inherited Airbnb scale.
 
 ### Don't
-- Don't give Fidelis-facing content (claims already resolved elsewhere) an actionable button in this app — the resolution genuinely happens in another company's system.
+- Don't give Agent Insure-facing content (claims already resolved elsewhere) an actionable button in this app — the resolution genuinely happens in another company's system.
 - Don't introduce a second UI typeface.
 - Don't skip the dark-mode block — unlike Airbnb, this tool has no fixed hours of use.
 
