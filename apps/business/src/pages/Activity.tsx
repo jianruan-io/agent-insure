@@ -33,19 +33,19 @@ function InvoiceModal({ html, onClose }: { html: string; onClose: () => void }) 
     >
       <div
         data-testid="invoice-modal"
-        className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-[0_12px_32px_rgba(0,0,0,.16)]"
+        className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-border bg-card p-6 shadow-[0_12px_32px_rgba(0,0,0,.16)]"
       >
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex shrink-0 items-center justify-between">
           <h2 className="text-sm font-semibold">Invoice as PayableAgent read it</h2>
           <button type="button" className="text-muted-foreground hover:text-foreground" onClick={onClose}>
             close
           </button>
         </div>
-        <p className="mb-3 text-xs text-muted-foreground">
+        <p className="mb-3 shrink-0 text-xs text-muted-foreground">
           Select all (⌘/Ctrl+A) inside the invoice below to reveal any concealed text.
         </p>
         <div
-          className="rounded-lg border border-border bg-white p-4 text-black"
+          className="min-h-0 overflow-y-auto rounded-lg border border-border bg-white p-4 text-black"
           dangerouslySetInnerHTML={{ __html: html }}
         />
       </div>
