@@ -23,7 +23,7 @@ const VALID_REQUEST_RESPONSE = {
   },
 };
 
-const STORAGE_KEY = 'agent-insure-northbeam-v1';
+const STORAGE_KEY = 'agent-insure-business-v1';
 
 /**
  * Seeds `rules.locked` directly in localStorage instead of driving the real ENS

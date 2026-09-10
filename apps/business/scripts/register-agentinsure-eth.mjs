@@ -13,12 +13,12 @@
 // Not part of the live demo — run once, by hand, before using the app's "Lock Rules
 // On-Chain" button, from the repo root:
 //
-//   node apps/northbeam/scripts/register-agentinsure-eth.mjs
+//   node apps/business/scripts/register-agentinsure-eth.mjs
 //
 // Reads its inputs (SEPOLIA_PRIVATE_KEY, the ENS_* contract addresses) from the repo root
 // .env.local — same file server/ reads from, per this repo's own convention (see the root
 // .env.example). Its output (VITE_ENS_RESOLVER_ADDRESS) goes to a different file, though:
-// apps/northbeam/.env.local, since that one's for the frontend and is never read by this
+// apps/business/.env.local, since that one's for the frontend and is never read by this
 // script or by server/.
 //
 // Idempotent: re-running after a successful registration reports "already registered,
@@ -108,7 +108,7 @@ async function main() {
 
   if (!available) {
     console.log(`${NAME} is already registered — skipping.`);
-    console.log('If VITE_ENS_RESOLVER_ADDRESS is not yet set in apps/northbeam/.env.local, look up the');
+    console.log('If VITE_ENS_RESOLVER_ADDRESS is not yet set in apps/business/.env.local, look up the');
     console.log(`resolver this name currently points to via the ENS Explorer for ${NAME}.`);
     return;
   }
@@ -204,7 +204,7 @@ async function main() {
   console.log('');
   console.log(`${NAME} registered. tx: ${registerHash}`);
   console.log('');
-  console.log('Add this to apps/northbeam/.env.local:');
+  console.log('Add this to apps/business/.env.local:');
   console.log(`  VITE_ENS_RESOLVER_ADDRESS=${resolverAddress}`);
   console.log(`  VITE_ENS_AGENT_NAME=payableagent.${NAME}`);
 }

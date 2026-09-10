@@ -1,7 +1,7 @@
 ---
 version: alpha
-name: Fidelis Portal
-description: Fidelis's interface is an actual insurer's claims desk — institutional and a shade more formal than Northbeam's, because it's the counterparty whose judgment the payout depends on. Same inherited system as Northbeam (Airbnb's full rounding and soft low-opacity elevation, Plus Jakarta Sans, JetBrains Mono for ledger data) recolored around a deep plum accent — legacy-insurer gravitas without reading as an alert color, and distinct enough from navy that it won't blend into the ENS sponsor tag every Fidelis screen shows beside it.
+name: Agent Insure HQ
+description: Agent Insure's interface is an actual insurer's claims desk — institutional and a shade more formal than Northbeam's, because it's the counterparty whose judgment the payout depends on. Same inherited system as Northbeam (Airbnb's full rounding and soft low-opacity elevation, Plus Jakarta Sans, JetBrains Mono for ledger data) recolored around a deep plum accent — legacy-insurer gravitas without reading as an alert color, and distinct enough from navy that it won't blend into the ENS sponsor tag every Agent Insure screen shows beside it.
 colors:
   primary: "#5B3A78"
   primary-strong: "#452C5E"
@@ -188,11 +188,11 @@ components:
     textColor: "{colors.body}"
 ---
 
-# Fidelis Portal
+# Agent Insure HQ
 
 ## Overview
 
-Fidelis is the insurer's own app — a claims desk, not a marketing product. It's the counterparty whose judgment the entire payout depends on, so its interface carries slightly more institutional weight than Northbeam's: same inherited shape system (Airbnb's full rounding, soft low-opacity elevation, tight micro / loose macro spacing) and same typography (Plus Jakarta Sans, JetBrains Mono for ledger data), but recolored around a deep garnet (`{colors.primary}` — #8B3A46) instead of Northbeam's teal. Garnet is a deliberate echo of the navy-and-deep-red premium pairing legacy insurers like Chubb use for gravitas — without reusing navy itself, which would visually blend into the ENS sponsor tag that appears on nearly every Fidelis screen next to the brand chrome.
+Agent Insure is the insurer's own app — a claims desk, not a marketing product. It's the counterparty whose judgment the entire payout depends on, so its interface carries slightly more institutional weight than Northbeam's: same inherited shape system (Airbnb's full rounding, soft low-opacity elevation, tight micro / loose macro spacing) and same typography (Plus Jakarta Sans, JetBrains Mono for ledger data), but recolored around a deep garnet (`{colors.primary}` — #8B3A46) instead of Northbeam's teal. Garnet is a deliberate echo of the navy-and-deep-red premium pairing legacy insurers like Chubb use for gravitas — without reusing navy itself, which would visually blend into the ENS sponsor tag that appears on nearly every Agent Insure screen next to the brand chrome.
 
 **Key Characteristics:**
 - Garnet (`{colors.primary}` — #8B3A46) is the single saturated accent — reserved for primary actions, the active queue item, and the active sidebar state
@@ -205,7 +205,7 @@ Fidelis is the insurer's own app — a claims desk, not a marketing product. It'
 Identical structure to Northbeam's palette — neutral surfaces, one saturated accent, three fixed sponsor hues — with garnet standing in for teal.
 
 ### Brand & Accent
-- **Fidelis Garnet** (`{colors.primary}` — #8B3A46): reserved for the Run Investigation / Run Payout buttons and the active claim in the queue.
+- **Agent Insure Garnet** (`{colors.primary}` — #8B3A46): reserved for the Run Investigation / Run Payout buttons and the active claim in the queue.
 - **Garnet Strong** (`{colors.primary-strong}` — #6E2D37): pressed/hover state.
 - **Success** (`{colors.success}` — #1E8F55): Paid status, completed investigation/payout steps.
 - **Warning** (`{colors.warning}` — #D6900B): Investigated-but-unpaid status.
@@ -217,7 +217,7 @@ Identical values to Northbeam: `{colors.surface}` #FFFFFF, `{colors.surface-mute
 ### Sponsor Tags (shared, fixed — identical to Northbeam)
 - **Hedera** (`{colors.hedera}` — #7C5CFF on #F1EDFF)
 - **ENS** (`{colors.ens}` — #4C82FB on #EAF1FF)
-- **World** (`{colors.world}` — #E0A825 on #FFF6E0) — appears rarely here; World's touchpoint lives mostly in Northbeam's claim-filing flow, not Fidelis's investigation.
+- **World** (`{colors.world}` — #E0A825 on #FFF6E0) — appears rarely here; World's touchpoint lives mostly in Northbeam's claim-filing flow, not Agent Insure's investigation.
 
 ### Dark Mode
 `colors-dark.primary` (#C96B78) is a lighter garnet tuned for dark surfaces, paired with a near-black `colors-dark.on-primary` (#20090C) rather than white — a lightness-driven contrast flip, not a hue change.
@@ -228,7 +228,7 @@ Identical scale and rationale to Northbeam's doc: Plus Jakarta Sans for UI, JetB
 
 ## Layout
 
-Same sidebar-plus-main shell as Northbeam, but Fidelis's main content is narrower in practice — two nav items (Overview, Claims Queue) instead of four — and its signature screen is a two-pane split (`queue-item` list at 220px, detail panel filling the rest) rather than a single scrolling column.
+Same sidebar-plus-main shell as Northbeam, but Agent Insure's main content is narrower in practice — two nav items (Overview, Claims Queue) instead of four — and its signature screen is a two-pane split (`queue-item` list at 220px, detail panel filling the rest) rather than a single scrolling column.
 
 ## Elevation & Depth
 
@@ -251,7 +251,7 @@ Identical radius scale to Northbeam's, unchanged.
 
 ### Don't
 - Don't reuse navy for the accent, even though it's the more "traditional insurer" color — it collides visually with the ENS sponsor tag.
-- Don't let Fidelis's garnet bleed into Northbeam's screens or vice versa; the accent is the one visual signal that these are two separate companies.
+- Don't let Agent Insure's garnet bleed into Northbeam's screens or vice versa; the accent is the one visual signal that these are two separate companies.
 
 ## Iteration Guide
 

@@ -12,7 +12,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
 
 const app = express();
 app.use(express.json());
-// Both Northbeam and Fidelis run on localhost during the hackathon (plus a phone on
+// Both Northbeam and Agent Insure HQ run on localhost during the hackathon (plus a phone on
 // the same LAN for a live demo — private network ranges only, never the open internet).
 app.use(
   cors({
