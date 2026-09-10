@@ -28,6 +28,10 @@ async function lockRulesForTest(page: Page) {
  */
 test.describe('AP controller files a claim against a real backend record', () => {
   test('filing a claim creates a real backend record and renders it with the server-issued id', async ({ page }) => {
+    // TECH-607 made the poisoned-invoice simulation a real Hedera + x402 payment round
+    // trip, not an instant client-side dispatch — well beyond Playwright's 30s default.
+    test.setTimeout(90_000);
+
     await test.step('spending rules are already locked', async () => {
       await lockRulesForTest(page);
       await expect(page.getByText('Locked on ENS')).toBeVisible();
@@ -36,7 +40,7 @@ test.describe('AP controller files a claim against a real backend record', () =>
     await test.step('simulate the poisoned invoice that gets flagged', async () => {
       await page.goto('/activity');
       await page.getByRole('button', { name: 'Simulate poisoned invoice' }).click();
-      await expect(page.getByText('Flagged', { exact: true })).toBeVisible();
+      await expect(page.getByText('Flagged', { exact: true })).toBeVisible({ timeout: 60_000 });
     });
 
     await test.step('file a claim and confirm the real backend created it', async () => {
