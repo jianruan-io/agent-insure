@@ -7,7 +7,7 @@ function buildClaim(overrides: Partial<Claim> = {}): Claim {
     id: 'c1',
     vendor: 'Acme Corp',
     amount: 500,
-    time: '12 minutes ago',
+    account: '0.0.10465722',
     status: 'submitted',
     investigated: false,
     verdict: null,

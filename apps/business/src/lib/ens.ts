@@ -179,9 +179,9 @@ export function classifyLockError(err: unknown, stage: 'connect' | 'write'): Loc
 }
 
 function requireResolverAddress(): Address {
-  const address = import.meta.env.VITE_ENS_RESOLVER_ADDRESS as Address | undefined;
+  const address = import.meta.env.VITE_ENS_AGENT_RESOLVER_ADDRESS as Address | undefined;
   if (!address) {
-    throw new Error('VITE_ENS_RESOLVER_ADDRESS is not set — run scripts/register-agentinsure-eth.mjs first.');
+    throw new Error('VITE_ENS_AGENT_RESOLVER_ADDRESS is not set — run scripts/register-agentinsure-eth.mjs first.');
   }
   return address;
 }

@@ -92,7 +92,10 @@ function seedState(): StoreState {
     rules: {
       budgetCap: 5000,
       locked: false,
-      vendors: [{ name: 'Acme Corp', account: '0x492b…c11a' }],
+      // Real Hedera account — the one PayableAgent actually pays (server/src/routes/activity.js),
+      // not the original prototype's Ethereum-style placeholder. Locking the old value would
+      // make every real payment look like a deviation, even a genuinely correct one.
+      vendors: [{ name: 'Acme Corp', account: '0.0.10465723' }],
       writeTxHash: null,
       lockTxHash: null,
       lockStatus: 'idle',
@@ -381,7 +384,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const response = await fetch(`${API_URL}/api/claims`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vendor: source.vendor, amount: source.amount, activityId }),
+        // The real disputed destination — what InvestigatorAgent later compares against the
+        // vendor's ENS-locked account, not just the vendor's name.
+        body: JSON.stringify({ vendor: source.vendor, amount: source.amount, activityId, account: source.account }),
       });
       if (!response.ok) throw new Error('Could not file the claim.');
       const claim = await response.json();
