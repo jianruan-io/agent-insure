@@ -10,12 +10,12 @@ function etherscanTxUrl(txHash: string): string {
 }
 
 const LOCK_BUTTON_LABEL: Record<string, string> = {
-  idle: 'Lock Rules On-Chain',
-  written: 'Finish Locking On-Chain',
+  idle: 'Lock Agent Spending Rules Onchain',
+  written: 'Finish Locking Onchain',
   connecting: 'Connecting wallet…',
   writing: 'Writing to ENS…',
   locking: 'Locking permissions…',
-  error: 'Retry Lock Rules On-Chain',
+  error: 'Retry Lock Agent Spending Rules Onchain',
 };
 
 /** Hand-drawn stroke SVG matching the approved Northbeam Portal prototype's check icon —
@@ -45,14 +45,14 @@ function money(amount: number) {
  * Northbeam's Rules screen — PayableAgent's enforceable spending scope. Reproduces the
  * published prototype's `screenRules()` at 1:1 content parity: the budget cap stat, the
  * fixed approved-vendor list (with the disabled "add vendor" row), and the
- * "Lock Rules On-Chain" action. Locking flips `rules.locked` in the shared store, which is
- * what unlocks Activity's poisoned-invoice simulation for the rest of the demo.
+ * "Lock Agent Spending Rules Onchain" action. Locking flips `rules.locked` in the shared
+ * store, which is what unlocks Activity's poisoned-invoice simulation for the rest of the demo.
  */
 export function Rules() {
   const { state, lockRules, syncRulesFromChain } = useStore();
   const { rules } = state;
 
-  // The screen only ever calls this "Locked" once the real on-chain record backs it up —
+  // The screen only ever calls this "Locked" once the real onchain record backs it up —
   // never from the click alone. Best-effort: a stale read leaves the button ready to retry.
   useEffect(() => {
     void syncRulesFromChain();
