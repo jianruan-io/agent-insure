@@ -12,6 +12,7 @@ function buildClaim(overrides: Partial<Claim> = {}): Claim {
     investigated: false,
     verdict: null,
     reasoning: 'looks off',
+    payoutTxHash: null,
     ...overrides,
   };
 }

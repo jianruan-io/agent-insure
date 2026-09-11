@@ -3,7 +3,6 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AppSidebar } from './components/AppSidebar';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from './components/ui/sidebar';
 import { INITIAL_POOL_BALANCE } from './lib/claims/data';
-import { payClaim } from './lib/claims/transitions';
 import type { Claim } from './lib/claims/types';
 import Overview from './routes/Overview';
 import ClaimsQueue from './routes/ClaimsQueue';
@@ -38,18 +37,15 @@ export default function App() {
     setClaims((prev) => prev.map((c) => (c.id === claimId ? updated : c)));
   }
 
-  function handlePay(claimId: string) {
-    setClaims((prev) => {
-      let nextPoolBalance = poolBalance;
-      const next = prev.map((c) => {
-        if (c.id !== claimId) return c;
-        const result = payClaim(c, poolBalance);
-        nextPoolBalance = result.poolBalance;
-        return result.claim;
-      });
-      setPoolBalance(nextPoolBalance);
-      return next;
-    });
+  async function handlePay(claimId: string) {
+    const target = claims.find((c) => c.id === claimId);
+    if (!target || target.status === 'approved') return;
+
+    const response = await fetch(`${API_URL}/api/claims/${claimId}/payout`, { method: 'POST' });
+    const updated: Claim = await response.json();
+    if (!response.ok) return;
+    setClaims((prev) => prev.map((c) => (c.id === claimId ? updated : c)));
+    setPoolBalance((prev) => prev - target.amount);
   }
 
   return (

@@ -11,4 +11,6 @@ export interface Claim {
   investigated: boolean;
   verdict: 'FRAUD' | 'CLEARED' | null;
   reasoning: string | null;
+  /** The real Hedera transaction hash for the claim payout, once PayoutAgent has executed it. */
+  payoutTxHash: string | null;
 }

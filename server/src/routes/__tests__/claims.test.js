@@ -12,10 +12,11 @@ import { createPublicClient } from 'viem';
 
 const readContractMock = createPublicClient().readContract;
 
-const { createClaim, listClaims, recordVerdict } = await import('../claims.js');
-const { fetchVendorPaymentHistory } = await import('../../hedera/mirror-node.js');
+const { createClaim, listClaims, recordVerdict, recordPayout } = await import('../claims.js');
+const { fetchVendorPaymentHistory, fetchAccountBalance } = await import('../../hedera/mirror-node.js');
 const { readApprovedAccount } = await import('../../ens/read-rules.js');
 const { judgeClaim } = await import('../../investigator/judge-claim.js');
+const { authorizePayout } = await import('../../payout/authorize-payout.js');
 
 function buildInput(overrides = {}) {
   return {
@@ -95,6 +96,19 @@ describe('recordVerdict', () => {
   });
 });
 
+describe('recordPayout', () => {
+  it('updates the stored claim with the real payout transaction hash and marks status approved', () => {
+    const claim = createClaim(buildInput());
+    recordVerdict(claim.id, { verdict: 'FRAUD', reasoning: 'Does not match the locked account.' });
+
+    const updated = recordPayout(claim.id, { payoutTxHash: '0.0.10465721@1700000000.000000003' });
+
+    expect(updated.status).toBe('approved');
+    expect(updated.payoutTxHash).toBe('0.0.10465721@1700000000.000000003');
+    expect(listClaims().find((c) => c.id === claim.id).status).toBe('approved');
+  });
+});
+
 describe('fetchVendorPaymentHistory', () => {
   const originalTopicId = process.env.HEDERA_HCS_TOPIC_ID;
 
@@ -137,6 +151,29 @@ describe('fetchVendorPaymentHistory', () => {
     fetch.mockResolvedValueOnce({ ok: false, status: 500 });
 
     await expect(fetchVendorPaymentHistory({ vendor: 'Acme Corp' })).rejects.toThrow();
+  });
+});
+
+describe('fetchAccountBalance', () => {
+  beforeEach(() => {
+    fetch.mockReset();
+  });
+
+  it('returns the real, live HBAR balance for the given account, parsed from the Mirror Node response', async () => {
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ balance: { balance: 123456789, timestamp: '1700000000.000000000' } }),
+    });
+
+    const balance = await fetchAccountBalance('0.0.10465721');
+
+    expect(balance).toBe(123456789);
+  });
+
+  it('raises a real, distinct error when the Mirror Node request itself fails', async () => {
+    fetch.mockResolvedValueOnce({ ok: false, status: 500 });
+
+    await expect(fetchAccountBalance('0.0.10465721')).rejects.toThrow();
   });
 });
 
@@ -220,6 +257,50 @@ describe('judgeClaim', () => {
 
     expect(() =>
       judgeClaim({ history, disputedAccountId: '0.0.99999', disputedAmount: 500, approvedAccountId: '0.0.10465723' })
+    ).toThrow();
+  });
+});
+
+describe('authorizePayout', () => {
+  function buildClaim(overrides = {}) {
+    return {
+      id: 'claim-1',
+      verdict: 'FRAUD',
+      reasoning: "Does not match the vendor's locked, approved account 0.0.10465723.",
+      status: 'draft',
+      ...overrides,
+    };
+  }
+
+  it('authorizes payout when the re-derived verdict and reasoning match, the verdict is FRAUD, and the claim is unpaid', () => {
+    const claim = buildClaim();
+
+    const result = authorizePayout({ claim, rederivedVerdict: claim.verdict, rederivedReasoning: claim.reasoning });
+
+    expect(result.authorized).toBe(true);
+  });
+
+  it('raises a real, distinct error when the re-derived verdict or reasoning does not match the stored verdict', () => {
+    const claim = buildClaim();
+
+    expect(() =>
+      authorizePayout({ claim, rederivedVerdict: 'CLEARED', rederivedReasoning: 'Matches the locked account.' })
+    ).toThrow();
+  });
+
+  it('raises a real, distinct error when the verdict is CLEARED', () => {
+    const claim = buildClaim({ verdict: 'CLEARED', reasoning: 'Matches the locked account.' });
+
+    expect(() =>
+      authorizePayout({ claim, rederivedVerdict: 'CLEARED', rederivedReasoning: 'Matches the locked account.' })
+    ).toThrow();
+  });
+
+  it("raises a real, distinct error when the claim's status is already approved", () => {
+    const claim = buildClaim({ status: 'approved' });
+
+    expect(() =>
+      authorizePayout({ claim, rederivedVerdict: claim.verdict, rederivedReasoning: claim.reasoning })
     ).toThrow();
   });
 });

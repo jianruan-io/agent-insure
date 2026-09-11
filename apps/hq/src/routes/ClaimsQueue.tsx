@@ -6,6 +6,12 @@ function money(amount: number): string {
   return `$${amount.toLocaleString()}`;
 }
 
+/** Same real HashScan link convention as apps/business's Activity feed — never guessed,
+ *  confirmed by actually resolving a real transaction there. */
+function hashscanTxUrl(transactionId: string): string {
+  return `https://hashscan.io/testnet/transaction/${transactionId}`;
+}
+
 function StatusBadge({ claim }: { claim: Claim }) {
   if (claim.status === 'approved') {
     return (
@@ -67,14 +73,23 @@ function ClaimDetail({ claim, onInvestigate, onPay }: ClaimDetailProps) {
       {claim.investigated && (
         <div>
           <div className="mb-3 text-sm font-bold">PayoutAgent</div>
-          {claim.status === 'approved' ? (
-            <div className="rounded-lg bg-muted px-3 py-2 font-mono text-xs text-muted-foreground">
-              Hedera tx: 0.0.5482991@170234… (demo, not a real transaction)
-            </div>
-          ) : (
+          {claim.status === 'approved' && claim.payoutTxHash ? (
+            <a
+              href={hashscanTxUrl(claim.payoutTxHash)}
+              target="_blank"
+              rel="noreferrer"
+              className="block rounded-lg bg-muted px-3 py-2 font-mono text-xs text-muted-foreground underline"
+            >
+              Hedera tx: {claim.payoutTxHash}
+            </a>
+          ) : claim.verdict === 'FRAUD' ? (
             <Button size="sm" onClick={() => onPay(claim.id)}>
               Run Payout
             </Button>
+          ) : (
+            <div className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+              Not payable — InvestigatorAgent found no fraud, nothing to reimburse.
+            </div>
           )}
         </div>
       )}

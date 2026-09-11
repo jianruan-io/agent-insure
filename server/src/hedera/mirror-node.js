@@ -22,3 +22,16 @@ export async function fetchVendorPaymentHistory({ vendor }) {
 
   return (body.messages ?? []).map((entry) => decodeTopicMessage(entry.message)).filter((record) => record.vendor === vendor);
 }
+
+/**
+ * PayoutAgent's real funds check — the reserve pool's own live HBAR balance, read straight
+ * from Hedera Mirror Node, never a client-side or cached number.
+ */
+export async function fetchAccountBalance(accountId) {
+  const response = await fetch(`${MIRROR_NODE_BASE_URL}/api/v1/accounts/${accountId}`);
+  if (!response.ok) {
+    throw new Error(`Hedera Mirror Node request failed: ${response.status}`);
+  }
+  const body = await response.json();
+  return body.balance.balance;
+}
