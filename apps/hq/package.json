@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --port 6323",
+    "dev": "vite --port 6324",
     "build": "vite build",
-    "preview": "vite preview --port 6323",
+    "preview": "vite preview --port 6324",
     "test": "vitest run"
   },
   "dependencies": {
@@ -20,6 +20,7 @@
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.3.0",
     "@types/react": "^19.1.4",
     "@types/react-dom": "^19.1.3",
