@@ -48,7 +48,11 @@ function ClaimDetail({ claim, onInvestigate, onPay }: ClaimDetailProps) {
         <div className="mb-3 text-sm font-bold">InvestigatorAgent</div>
         {claim.investigated ? (
           <>
-            <span className="inline-flex items-center gap-1 rounded-full border border-transparent bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive">
+            <span
+              className={`inline-flex items-center gap-1 rounded-full border border-transparent px-2 py-0.5 text-[11px] font-medium ${
+                claim.verdict === 'FRAUD' ? 'bg-destructive/10 text-destructive' : 'bg-success/10 text-success'
+              }`}
+            >
               VERDICT: {claim.verdict}
             </span>
             <div className="mt-2 text-xs text-muted-foreground">{claim.reasoning}</div>

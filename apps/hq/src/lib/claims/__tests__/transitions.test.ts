@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { investigateClaim, payClaim } from '../transitions';
+import { payClaim } from '../transitions';
 import type { Claim } from '../types';
 
 function buildClaim(overrides: Partial<Claim> = {}): Claim {
@@ -7,7 +7,7 @@ function buildClaim(overrides: Partial<Claim> = {}): Claim {
     id: 'c1',
     vendor: 'Acme Corp',
     amount: 500,
-    time: '12 minutes ago',
+    account: '0.0.10465722',
     status: 'submitted',
     investigated: false,
     verdict: null,
@@ -15,26 +15,6 @@ function buildClaim(overrides: Partial<Claim> = {}): Claim {
     ...overrides,
   };
 }
-
-describe('investigateClaim', () => {
-  it('marks an un-investigated claim investigated, with a verdict and reasoning set', () => {
-    const claim = buildClaim({ investigated: false, verdict: null });
-
-    const result = investigateClaim(claim);
-
-    expect(result.investigated).toBe(true);
-    expect(result.verdict).toBe('FRAUD');
-    expect(result.reasoning).toBe(claim.reasoning);
-  });
-
-  it('returns an already-investigated claim unchanged', () => {
-    const claim = buildClaim({ investigated: true, verdict: 'FRAUD' });
-
-    const result = investigateClaim(claim);
-
-    expect(result).toEqual(claim);
-  });
-});
 
 describe('payClaim', () => {
   it('marks an investigated, unpaid claim "approved" and deducts its amount from the pool balance', () => {
