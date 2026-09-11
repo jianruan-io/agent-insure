@@ -10,7 +10,9 @@ const COVERAGE_FEE_AMOUNT = process.env.HEDERA_COVERAGE_FEE_AMOUNT || '10000000'
 // `new Hbar(500)` would mean 500 real HBAR, which would drain the operator's testnet balance
 // in a couple of demo runs. The real on-chain transfer uses this small, fixed test amount
 // instead, same as the coverage fee already does — decoupled from the invoice's face value.
-const VENDOR_TRANSFER_TINYBARS = process.env.HEDERA_VENDOR_PAYMENT_TINYBARS || '100000000'; // 1 test HBAR
+// Exported so PayoutAgent (server/src/routes/claims.js) can reimburse Northbeam with the
+// exact same fixed amount PayableAgent originally sent to the wrong account.
+export const VENDOR_TRANSFER_TINYBARS = process.env.HEDERA_VENDOR_PAYMENT_TINYBARS || '100000000'; // 1 test HBAR
 
 // A local model, no cloud API key — Ollama's OpenAI-compatible server on its default port.
 const AI_MODEL = 'llama3.2:3b';

@@ -34,3 +34,24 @@ export function getPayableAgentPrivateKey() {
   if (!key) throw new Error('HEDERA_OPERATOR_PRIVATE_KEY is not set.');
   return parseOperatorPrivateKey(key);
 }
+
+/** The reserve pool's own Hedera testnet client — the account PayoutAgent pays real claim
+ *  payouts from. Created by `server/scripts/setup-hedera.mjs` with the same ECDSA key type
+ *  as PayableAgent's own operator account. */
+export function getReservePoolClient() {
+  const client = Client.forTestnet();
+  client.setOperator(getReservePoolAccountId(), getReservePoolPrivateKey());
+  return client;
+}
+
+export function getReservePoolAccountId() {
+  const accountId = process.env.HEDERA_RESERVE_POOL_ACCOUNT_ID;
+  if (!accountId) throw new Error('HEDERA_RESERVE_POOL_ACCOUNT_ID is not set — run server/scripts/setup-hedera.mjs first.');
+  return accountId;
+}
+
+export function getReservePoolPrivateKey() {
+  const key = process.env.HEDERA_RESERVE_POOL_PRIVATE_KEY;
+  if (!key) throw new Error('HEDERA_RESERVE_POOL_PRIVATE_KEY is not set — run server/scripts/setup-hedera.mjs first.');
+  return parseOperatorPrivateKey(key);
+}
