@@ -9,6 +9,11 @@ function money(amount: number) {
   return `$${amount.toLocaleString()}`;
 }
 
+/** Real proof lives on Hedera's own public explorer — same convention as Activity.tsx. */
+function hashscanTxUrl(transactionId: string): string {
+  return `https://hashscan.io/testnet/transaction/${transactionId}`;
+}
+
 /** Hand-drawn stroke SVG matching the approved Northbeam Portal prototype's check icon —
  *  same convention as Rules.tsx/AppSidebar.tsx/Overview.tsx. */
 function CheckIcon() {
@@ -52,8 +57,20 @@ function ClaimCard({ claim, onStartSelfie }: { claim: ClaimEntry; onStartSelfie:
     );
   } else {
     body = (
-      <div className="flex items-center gap-2 text-sm font-semibold text-[var(--success)]">
-        <CheckIcon /> Approved — {money(claim.amount)} returned <Badge variant="hedera">Hedera</Badge>
+      <div>
+        <div className="flex items-center gap-2 text-sm font-semibold text-[var(--success)]">
+          <CheckIcon /> Approved — {money(claim.amount)} returned <Badge variant="hedera">Hedera</Badge>
+        </div>
+        {claim.payoutTxHash ? (
+          <a
+            href={hashscanTxUrl(claim.payoutTxHash)}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-1 block font-mono text-xs text-muted-foreground underline"
+          >
+            Hedera tx: {claim.payoutTxHash}
+          </a>
+        ) : null}
       </div>
     );
   }
