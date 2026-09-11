@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
@@ -19,9 +20,50 @@ function formatFeeAmount(rawAmount: string): string {
   return `${(Number(rawAmount) / 100_000_000).toFixed(2)} ℏ`;
 }
 
+/** The real invoice document PayableAgent read, rendered exactly as authored — a
+ *  concealed instruction stays visually invisible against the document's own white
+ *  background, same as it was for PayableAgent, until selected. */
+function InvoiceModal({ html, onClose }: { html: string; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        data-testid="invoice-modal"
+        className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-border bg-card p-6 shadow-[0_12px_32px_rgba(0,0,0,.16)]"
+      >
+        <div className="mb-3 flex shrink-0 items-center justify-between">
+          <h2 className="text-sm font-semibold">Invoice as PayableAgent read it</h2>
+          <button type="button" className="text-muted-foreground hover:text-foreground" onClick={onClose}>
+            close
+          </button>
+        </div>
+        <p className="mb-3 shrink-0 text-xs text-muted-foreground">
+          Select all (⌘/Ctrl+A) inside the invoice below to reveal any concealed text.
+        </p>
+        <div
+          className="min-h-0 overflow-y-auto rounded-lg border border-border bg-white p-4 text-black"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      </div>
+    </div>
+  );
+}
+
 /** One row of the Activity Feed table, plus its collapsible reasoning row underneath —
  *  mirrors the published prototype's `activityRow()`. */
-function ActivityRow({ entry, onToggleReason }: { entry: ActivityEntry; onToggleReason: (id: string) => void }) {
+function ActivityRow({
+  entry,
+  onToggleReason,
+  onViewInvoice,
+}: {
+  entry: ActivityEntry;
+  onToggleReason: (id: string) => void;
+  onViewInvoice: (id: string) => void;
+}) {
   const hasRealProof = Boolean(entry.feeTxHash && entry.paymentTxHash);
   return (
     <>
@@ -82,6 +124,15 @@ function ActivityRow({ entry, onToggleReason }: { entry: ActivityEntry; onToggle
                 {entry.hcsSequenceNumber ? <span>logged to Hedera Consensus Service · seq #{entry.hcsSequenceNumber}</span> : null}
               </div>
             ) : null}
+            {entry.flagged && entry.invoiceHtml ? (
+              <button
+                type="button"
+                className="mt-2 text-xs font-semibold text-primary hover:underline"
+                onClick={() => onViewInvoice(entry.id)}
+              >
+                View invoice
+              </button>
+            ) : null}
           </td>
         </tr>
       ) : null}
@@ -101,6 +152,8 @@ export function Activity() {
   const { rules, activity, activitySimulating, activitySimulateError } = state;
   const hasOpenFlag = activity.some((a) => a.flagged && !a.claimed);
   const rows = activity.slice().reverse();
+  const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
+  const viewingInvoice = activity.find((a) => a.id === viewingInvoiceId);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -156,12 +209,16 @@ export function Activity() {
             </thead>
             <tbody>
               {rows.map((entry) => (
-                <ActivityRow key={entry.id} entry={entry} onToggleReason={toggleReason} />
+                <ActivityRow key={entry.id} entry={entry} onToggleReason={toggleReason} onViewInvoice={setViewingInvoiceId} />
               ))}
             </tbody>
           </table>
         </div>
       </Card>
+
+      {viewingInvoice?.invoiceHtml ? (
+        <InvoiceModal html={viewingInvoice.invoiceHtml} onClose={() => setViewingInvoiceId(null)} />
+      ) : null}
     </div>
   );
 }

@@ -35,6 +35,9 @@ export interface ActivityEntry {
   feeTxHash?: string;
   paymentTxHash?: string;
   hcsSequenceNumber?: string;
+  /** The real invoice document PayableAgent read, hidden instruction included — only
+   *  present on a flagged row, straight from the server's real response. */
+  invoiceHtml?: string;
 }
 
 export type ClaimStatus = 'approved' | 'submitted' | 'awaiting-identity';
@@ -80,9 +83,9 @@ const STORAGE_KEY = 'agent-insure-business-v1';
 // Both Northbeam and Agent Insure HQ run on localhost during the hackathon — see SelfieModal.tsx.
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8787';
 
-const NORMAL_REASONING = 'Matches the locked vendor list — same account as every past payment. Approved.';
-const ATTACK_REASONING =
-  'New account for this vendor — never paid before. Outside the locked vendor list. Looks like manipulation, not a normal decision.';
+// Seed rows predate the real payment pipeline — their reasoning is fixed demo copy, not
+// PayableAgent's own output. Every row from the real flow carries the server's real reasoning.
+const SEED_REASONING = 'Matches the locked vendor list — same account as every past payment. Approved.';
 
 function seedState(): StoreState {
   return {
@@ -105,7 +108,7 @@ function seedState(): StoreState {
         flagged: false,
         claimed: false,
         expanded: false,
-        reasoning: NORMAL_REASONING,
+        reasoning: SEED_REASONING,
       },
       {
         id: 'a2',
@@ -116,7 +119,7 @@ function seedState(): StoreState {
         flagged: false,
         claimed: false,
         expanded: false,
-        reasoning: NORMAL_REASONING,
+        reasoning: SEED_REASONING,
       },
     ],
     claims: [
@@ -293,8 +296,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [state]);
 
-  /** Calls the real payment pipeline (Claude decision or hardcoded poisoned target →
-   *  x402 coverage fee → Hedera vendor transfer → HCS log) and dispatches its real result. */
+  /** Calls the real payment pipeline (PayableAgent's real AI call reading the real invoice
+   *  → x402 coverage fee → Hedera vendor transfer → HCS log) and dispatches its real result —
+   *  reasoning and flagged state come straight from what PayableAgent actually decided, never
+   *  chosen client-side by which button was clicked. */
   const simulateInvoice = async (kind: 'normal' | 'poisoned') => {
     dispatch({ type: 'simulate-start' });
     try {
@@ -311,14 +316,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         account: body.account,
         amount: body.amount,
         time: 'Just now',
-        flagged: kind === 'poisoned',
+        flagged: body.flagged,
         claimed: false,
         expanded: false,
-        reasoning: kind === 'poisoned' ? ATTACK_REASONING : NORMAL_REASONING,
+        reasoning: body.reasoning,
         feeAmount: body.feeAmount,
         feeTxHash: body.feeTxHash,
         paymentTxHash: body.paymentTxHash,
         hcsSequenceNumber: body.hcsSequenceNumber,
+        invoiceHtml: body.invoiceHtml,
       };
       dispatch({ type: 'simulate-success', entry });
     } catch (err) {
