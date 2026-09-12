@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { createWalletClient, createPublicClient, http, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { sepolia } from 'viem/chains';
-import { normalizePrivateKey } from '../scripts/normalize-private-key.mjs';
+import { normalizePrivateKey } from '../../scripts/normalize-private-key.mjs';
 
 /**
  * No mocking of the ENS/chain interaction itself — every call this test drives hits the
@@ -19,7 +19,7 @@ import { normalizePrivateKey } from '../scripts/normalize-private-key.mjs';
  */
 
 try {
-  process.loadEnvFile(fileURLToPath(new URL('../../../.env.local', import.meta.url)));
+  process.loadEnvFile(fileURLToPath(new URL('../../../../.env.local', import.meta.url)));
 } catch {
   // No root .env.local — the test.skip just below reports this clearly instead.
 }
@@ -97,6 +97,12 @@ test.describe('AP controller locks PayableAgent’s spending rules on real ENS t
         await expect(page.getByText('Locked on ENS')).toBeVisible();
       });
       await test.step("independent proof on ENS's own public explorer — not our app's word for it", async () => {
+        const namePage = await page.context().newPage();
+        await namePage.goto('https://hackathon-deployment-portal-app.ens-cf.workers.dev/agentinsure.eth');
+        await expect(namePage.getByText('agentinsure.eth')).toBeVisible({ timeout: 15_000 });
+        await expect(namePage.getByText('Owner')).toBeVisible();
+        await namePage.close();
+
         const ensPage = await page.context().newPage();
         await ensPage.goto('https://hackathon-deployment-portal-app.ens-cf.workers.dev/resolver/0x8B6195c5A125201FA3C63fb6637A8a70105d6e5c');
         await expect(ensPage.getByText('ENS Permissioned Resolver')).toBeVisible({ timeout: 15_000 });
