@@ -88,6 +88,14 @@ test.describe("PayoutAgent independently verifies the verdict and executes a rea
       // The real proof: the claim's real $500 was reimbursed as exactly 500.00 real mUSDC,
       // not a fixed, unrelated amount.
       await expectRealTokenAmount(body.payoutTxHash, fraudClaim.amount);
+
+      // Independent proof, on Hedera's own public explorer — not our app's word for it.
+      const payoutUrl = await txLink.getAttribute('href');
+      const explorerPage = await page.context().newPage();
+      await explorerPage.goto(payoutUrl!);
+      await expect(explorerPage.getByText('SUCCESS')).toBeVisible({ timeout: 15_000 });
+      await expect(explorerPage.getByText('CRYPTO TRANSFER')).toBeVisible();
+      await explorerPage.close();
     });
 
     await test.step('refuses to pay a real CLEARED claim — no fraud confirmed, nothing offered to pay', async () => {

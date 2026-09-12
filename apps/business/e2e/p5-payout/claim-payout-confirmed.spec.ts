@@ -83,6 +83,14 @@ test.describe("Northbeam's portal notices a real payout and shows it resolved", 
       });
       await expect(txLink).toBeVisible();
       await expect(txLink).toHaveAttribute('href', HASHSCAN_TX_URL);
+
+      // Independent proof, on Hedera's own public explorer — not Agent Insure's word for it.
+      const payoutUrl = await txLink.getAttribute('href');
+      const explorerPage = await page.context().newPage();
+      await explorerPage.goto(payoutUrl!);
+      await expect(explorerPage.getByText('SUCCESS')).toBeVisible({ timeout: 15_000 });
+      await expect(explorerPage.getByText('CRYPTO TRANSFER')).toBeVisible();
+      await explorerPage.close();
     });
   });
 });
