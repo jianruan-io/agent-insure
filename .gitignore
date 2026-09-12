@@ -11,6 +11,10 @@ playwright-report/
 .env.local
 .env.*.local
 
+# MCP server config can carry bearer-token headers (real incident: a real API key ended
+# up here twice tonight) — never tracked, regenerate locally with `claude mcp add`
+.mcp.json
+
 # Ideation brainstorm scratchpad
 tools/journey-tracker/
 
