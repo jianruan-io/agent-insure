@@ -53,6 +53,9 @@ export interface ClaimEntry {
   seed: boolean;
   status: ClaimStatus;
   reasoning: string;
+  /** The real Hedera transaction PayoutAgent executed — only set once Agent Insure has
+   *  actually paid this claim back. */
+  payoutTxHash: string | null;
 }
 
 export type RulesLockStatus = 'idle' | 'connecting' | 'writing' | 'written' | 'locking' | 'locked' | 'error';
@@ -134,6 +137,7 @@ function seedState(): StoreState {
         seed: true,
         status: 'approved',
         reasoning: 'New account, never paid before. Outside the locked vendor list.',
+        payoutTxHash: null,
       },
     ],
     nextActId: 3,
@@ -170,6 +174,7 @@ type Action =
   | { type: 'toggle-reason'; id: string }
   | { type: 'file-claim'; activityId: string; claimId: string }
   | { type: 'complete-selfie'; claimId: string }
+  | { type: 'claim-payout-confirmed'; claimId: string; payoutTxHash: string }
   | { type: 'reset' };
 
 function reducer(state: StoreState, action: Action): StoreState {
@@ -228,6 +233,7 @@ function reducer(state: StoreState, action: Action): StoreState {
         seed: false,
         status: 'awaiting-identity',
         reasoning: source.reasoning,
+        payoutTxHash: null,
       };
       return {
         ...state,
@@ -240,6 +246,14 @@ function reducer(state: StoreState, action: Action): StoreState {
       return {
         ...state,
         claims: state.claims.map((c) => (c.id === action.claimId ? { ...c, status: 'submitted' } : c)),
+      };
+
+    case 'claim-payout-confirmed':
+      return {
+        ...state,
+        claims: state.claims.map((c) =>
+          c.id === action.claimId ? { ...c, status: 'approved', payoutTxHash: action.payoutTxHash } : c
+        ),
       };
 
     case 'reset':
@@ -298,6 +312,37 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // no-op — persistence is a nice-to-have, not a requirement to keep working
     }
   }, [state]);
+
+  // Polls the real claims record while any claim is still submitted — the same "click and
+  // watch it happen live" pattern as everything else real in this demo, no manual reload
+  // needed to see a claim actually get paid back.
+  const pendingClaimIds = state.claims
+    .filter((c) => c.status === 'submitted')
+    .map((c) => c.id)
+    .join(',');
+  useEffect(() => {
+    if (!pendingClaimIds) return;
+    const pending = pendingClaimIds.split(',');
+
+    const poll = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/claims`);
+        if (!response.ok) return;
+        const real: Array<{ id: string; status: string; payoutTxHash: string | null }> = await response.json();
+        for (const claimId of pending) {
+          const match = real.find((r) => r.id === claimId);
+          if (match?.status === 'approved' && match.payoutTxHash) {
+            dispatch({ type: 'claim-payout-confirmed', claimId, payoutTxHash: match.payoutTxHash });
+          }
+        }
+      } catch {
+        // Best-effort — a transient network hiccup just tries again next tick.
+      }
+    };
+
+    const interval = setInterval(poll, 3000);
+    return () => clearInterval(interval);
+  }, [pendingClaimIds]);
 
   /** Calls the real payment pipeline (PayableAgent's real AI call reading the real invoice
    *  → x402 coverage fee → Hedera vendor transfer → HCS log) and dispatches its real result —
