@@ -1,5 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
+test.use({ baseURL: 'http://localhost:6323' });
+
 const STORAGE_KEY = 'agent-insure-business-v1';
 const HASHSCAN_TX_URL = /^https:\/\/hashscan\.io\/testnet\/transaction\/\d+\.\d+\.\d+@\d+\.\d+$/;
 const MIRROR_NODE_URL = 'https://testnet.mirrornode.hedera.com';
@@ -31,10 +33,10 @@ async function expectRealTokenAmount(sdkTransactionId: string, expectedDollarAmo
 }
 
 /**
- * Same rationale as claim-filing.spec.ts: this test's Goal is the real payment pipeline,
- * not the ENS lock itself — TECH-606's lock-rules.spec.ts is the one place that proves
- * that real, permanent, gas-costing flow. Seeding `rules.locked` directly avoids re-driving
- * a different Goal's mechanism on every run of this one.
+ * Same rationale as p3-file-the-claim.spec.ts: this test's Goal is the real payment
+ * pipeline, not the ENS lock itself — p1-lock-agent-payment-rules.spec.ts is the one place
+ * that proves that real, permanent, gas-costing flow. Seeding `rules.locked` directly
+ * avoids re-driving a different Goal's mechanism on every run of this one.
  */
 async function lockRulesForTest(page: Page) {
   await page.goto('/rules');
@@ -48,8 +50,8 @@ async function lockRulesForTest(page: Page) {
 
 /**
  * No mocking anywhere in this flow — both buttons hit the real running Express server
- * (started for real by playwright.config.ts's webServer), which itself charges a real
- * x402 coverage fee through the live Blocky402 facilitator, executes a real Hedera
+ * (started for real by the root playwright.config.ts's webServer), which itself charges a
+ * real x402 coverage fee through the live Blocky402 facilitator, executes a real Hedera
  * testnet transfer, and logs both to a real HCS topic. A passing run is proof the whole
  * chain of real services is wired correctly, not proof a mock was set up right.
  */

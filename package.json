@@ -1,0 +1,14 @@
+{
+  "name": "agent-insure-e2e",
+  "private": true,
+  "type": "module",
+  "description": "The one e2e suite for the one insurance-cycle journey at http://localhost:6322/proof/agent-insure-flywheel/insurance-cycle. Specs live flat in apps/e2e/ (p1 through p5, one file per phase), not folded into either app — apps/business and apps/hq are two UIs for the same journey, so their tests share one run and one report.",
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@worldcoin/idkit-core": "^4.2.4",
+    "viem": "^2.21.0"
+  },
+  "scripts": {
+    "test:e2e": "playwright test"
+  }
+}
