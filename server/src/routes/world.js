@@ -30,7 +30,10 @@ export function createWorldRequest() {
   return {
     app_id: appId,
     action,
-    environment: process.env.WORLD_ENVIRONMENT || 'sandbox',
+    // World ID 4.0's managed-RP setup registers actions under "staging"/"production" —
+    // "sandbox" was the legacy term and matches no registered action for a v4 RP,
+    // confirmed via the Developer Portal API (get_app_config's real actions_v4 list).
+    environment: process.env.WORLD_ENVIRONMENT || 'staging',
     rp_context: {
       rp_id: rpId,
       nonce,
