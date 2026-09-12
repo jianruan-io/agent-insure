@@ -1,18 +1,14 @@
 import OpenAI from 'openai';
-import { TransferTransaction, Hbar } from '@hiero-ledger/sdk';
+import { TransferTransaction, TokenId } from '@hiero-ledger/sdk';
 import { getPayableAgentClient, getPayableAgentAccountId, getPayableAgentPrivateKey } from '../hedera/client.js';
 import { chargeCoverageFee } from '../hedera/coverage-fee.js';
 import { logPaymentToHcs } from '../hedera/hcs.js';
 import { buildNormalInvoiceHtml, buildPoisonedInvoiceHtml, extractInvoiceText } from '../invoices/invoice-content.js';
 
 const COVERAGE_FEE_AMOUNT = process.env.HEDERA_COVERAGE_FEE_AMOUNT || '10000000'; // 0.1 test HBAR, fixed by design
-// The invoice's displayed amount (e.g. 500) is a nominal dollar figure, not literally HBAR —
-// `new Hbar(500)` would mean 500 real HBAR, which would drain the operator's testnet balance
-// in a couple of demo runs. The real on-chain transfer uses this small, fixed test amount
-// instead, same as the coverage fee already does — decoupled from the invoice's face value.
-// Exported so PayoutAgent (server/src/routes/claims.js) can reimburse Northbeam with the
-// exact same fixed amount PayableAgent originally sent to the wrong account.
-export const VENDOR_TRANSFER_TINYBARS = process.env.HEDERA_VENDOR_PAYMENT_TINYBARS || '100000000'; // 1 test HBAR
+// mUSDC (server/scripts/setup-musdc.mjs) has 2 decimals — the invoice's whole-dollar amount
+// (e.g. 500) converts to its smallest unit by multiplying by 100, same as real USDC cents.
+const MUSDC_DECIMALS = 100;
 
 // A local model, no cloud API key — Ollama's OpenAI-compatible server on its default port.
 const AI_MODEL = 'llama3.2:3b';
@@ -119,12 +115,13 @@ export function classifyPaymentError(err, stage) {
   return 'unknown';
 }
 
-async function executeVendorTransfer({ accountId }) {
+async function executeVendorTransfer({ accountId, amount }) {
   const client = getPayableAgentClient();
-  const tinybars = VENDOR_TRANSFER_TINYBARS;
+  const tokenId = TokenId.fromString(process.env.HEDERA_MUSDC_TOKEN_ID);
+  const smallestUnits = Math.round(amount * MUSDC_DECIMALS);
   const tx = new TransferTransaction()
-    .addHbarTransfer(getPayableAgentAccountId(), Hbar.fromTinybars(`-${tinybars}`))
-    .addHbarTransfer(accountId, Hbar.fromTinybars(tinybars));
+    .addTokenTransfer(tokenId, getPayableAgentAccountId(), -smallestUnits)
+    .addTokenTransfer(tokenId, accountId, smallestUnits);
   const submitted = await tx.execute(client);
   return submitted.getReceipt(client).then((receipt) => ({ ...receipt, transactionId: submitted.transactionId }));
 }
@@ -158,7 +155,7 @@ async function simulatePayment({ kind, vendor, amount, wrongAccountId }) {
 
   let paymentReceipt;
   try {
-    paymentReceipt = await executeVendorTransfer({ accountId: decision.accountId });
+    paymentReceipt = await executeVendorTransfer({ accountId: decision.accountId, amount: decision.amount });
   } catch (err) {
     throw Object.assign(new Error(err.message), { stage: 'payment' });
   }

@@ -35,3 +35,16 @@ export async function fetchAccountBalance(accountId) {
   const body = await response.json();
   return body.balance.balance;
 }
+
+/**
+ * PayoutAgent's real funds check for the mUSDC rail — the reserve pool's own live token
+ * balance, read straight from Hedera Mirror Node, never a client-side or cached number.
+ */
+export async function fetchTokenBalance(accountId, tokenId) {
+  const response = await fetch(`${MIRROR_NODE_BASE_URL}/api/v1/accounts/${accountId}`);
+  if (!response.ok) {
+    throw new Error(`Hedera Mirror Node request failed: ${response.status}`);
+  }
+  const body = await response.json();
+  return body.balance.tokens.find((entry) => entry.token_id === tokenId)?.balance ?? 0;
+}

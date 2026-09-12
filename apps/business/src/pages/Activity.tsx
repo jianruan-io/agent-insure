@@ -119,7 +119,7 @@ function ActivityRow({
                   target="_blank"
                   rel="noreferrer"
                 >
-                  vendor payment tx: {entry.paymentTxHash!.slice(0, 18)}…
+                  vendor payment tx ({money(entry.amount)} mUSDC): {entry.paymentTxHash!.slice(0, 18)}…
                 </a>
                 {entry.hcsSequenceNumber ? <span>logged to Hedera Consensus Service · seq #{entry.hcsSequenceNumber}</span> : null}
               </div>

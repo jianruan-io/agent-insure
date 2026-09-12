@@ -68,7 +68,7 @@ function ClaimCard({ claim, onStartSelfie }: { claim: ClaimEntry; onStartSelfie:
             rel="noreferrer"
             className="mt-1 block font-mono text-xs text-muted-foreground underline"
           >
-            Hedera tx: {claim.payoutTxHash}
+            Hedera tx ({money(claim.amount)} mUSDC): {claim.payoutTxHash}
           </a>
         ) : null}
       </div>

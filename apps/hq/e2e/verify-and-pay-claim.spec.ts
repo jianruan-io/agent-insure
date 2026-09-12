@@ -2,6 +2,33 @@ import { test, expect } from '@playwright/test';
 
 const API_URL = 'http://localhost:8787';
 const HASHSCAN_TX_URL = /^https:\/\/hashscan\.io\/testnet\/transaction\/\d+\.\d+\.\d+@\d+\.\d+$/;
+const MIRROR_NODE_URL = 'https://testnet.mirrornode.hedera.com';
+
+/** Converts the Hedera SDK's own transaction id format into the one Mirror Node's REST API expects. */
+function toMirrorNodeTxId(sdkTransactionId: string): string {
+  const [account, timestamp] = sdkTransactionId.split('@');
+  return `${account}-${timestamp.replace('.', '-')}`;
+}
+
+/**
+ * TECH-663's real proof: the claim's real dollar amount now moves as that exact real mUSDC
+ * amount, not a fixed figure decoupled from what's on screen. Reads straight from Hedera
+ * Mirror Node — retried briefly since indexing lags consensus by a couple of seconds.
+ */
+async function expectRealTokenAmount(sdkTransactionId: string, expectedDollarAmount: number) {
+  const expectedSmallestUnits = Math.round(expectedDollarAmount * 100);
+  const mirrorNodeId = toMirrorNodeTxId(sdkTransactionId);
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const response = await fetch(`${MIRROR_NODE_URL}/api/v1/transactions/${mirrorNodeId}`);
+    if (response.ok) {
+      const body = await response.json();
+      const transfer = body.transactions?.[0]?.token_transfers?.find((t: { amount: number }) => t.amount === expectedSmallestUnits);
+      if (transfer) return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+  throw new Error(`Mirror Node never showed a real ${expectedDollarAmount}-dollar-equal mUSDC transfer for ${sdkTransactionId}`);
+}
 
 /**
  * Seeds a real disputed claim directly and investigates it for real — the precondition this
@@ -54,9 +81,13 @@ test.describe("PayoutAgent independently verifies the verdict and executes a rea
       expect(body.status).toBe('approved');
       expect(body.payoutTxHash).toBeTruthy();
 
-      const txLink = page.getByRole('link', { name: new RegExp(`Hedera tx: ${body.payoutTxHash.replace(/[.@]/g, '\\$&')}`) });
+      const txLink = page.getByRole('link', { name: new RegExp(`Hedera tx \\(.*\\): ${body.payoutTxHash.replace(/[.@]/g, '\\$&')}`) });
       await expect(txLink).toBeVisible();
       await expect(txLink).toHaveAttribute('href', HASHSCAN_TX_URL);
+
+      // The real proof: the claim's real $500 was reimbursed as exactly 500.00 real mUSDC,
+      // not a fixed, unrelated amount.
+      await expectRealTokenAmount(body.payoutTxHash, fraudClaim.amount);
     });
 
     await test.step('refuses to pay a real CLEARED claim — no fraud confirmed, nothing offered to pay', async () => {
