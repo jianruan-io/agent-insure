@@ -96,6 +96,13 @@ test.describe('AP controller locks PayableAgent’s spending rules on real ENS t
       await test.step('confirm the already-locked state carries real on-chain proof', async () => {
         await expect(page.getByText('Locked on ENS')).toBeVisible();
       });
+      await test.step("independent proof on ENS's own public explorer — not our app's word for it", async () => {
+        const ensPage = await page.context().newPage();
+        await ensPage.goto('https://hackathon-deployment-portal-app.ens-cf.workers.dev/resolver/0x8B6195c5A125201FA3C63fb6637A8a70105d6e5c');
+        await expect(ensPage.getByText('ENS Permissioned Resolver')).toBeVisible({ timeout: 15_000 });
+        await expect(ensPage.getByText(/0x8B61.*6e5c/).first()).toBeVisible();
+        await ensPage.close();
+      });
       return;
     }
 
