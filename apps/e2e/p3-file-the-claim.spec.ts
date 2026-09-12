@@ -24,45 +24,26 @@ async function lockRulesForTest(page: Page) {
 }
 
 /**
- * No mocking here, on either side — unlike the identity-check tests below, which mock the
- * World boundary deliberately. `POST /api/claims` hits the real Express server (started for
- * real by the root playwright.config.ts's webServer), so a passing run is proof the wiring
- * works, not proof a mock was set up correctly.
+ * No mocking here — `POST /api/claims` hits the real Express server (started for real by
+ * the root playwright.config.ts's webServer), so a passing run is proof the wiring works,
+ * not proof a mock was set up correctly. Assumes rules are already locked and lands on
+ * `/claims` with the new claim's card on screen.
  */
-test.describe('AP controller files a claim against a real backend record', () => {
-  test('filing a claim creates a real backend record and renders it with the server-issued id', async ({ page }) => {
-    // TECH-607 made the poisoned-invoice simulation a real Hedera + x402 payment round
-    // trip, not an instant client-side dispatch — well beyond Playwright's 30s default.
-    test.setTimeout(90_000);
+async function simulatePoisonedInvoiceAndFileClaim(page: Page) {
+  await page.goto('/activity');
+  await page.getByRole('button', { name: 'Simulate poisoned invoice' }).click();
+  // TECH-607 made this a real Hedera + x402 payment round trip, not an instant
+  // client-side dispatch — wait for the real flagged row before moving on.
+  await expect(page.getByText('Flagged', { exact: true })).toBeVisible({ timeout: 60_000 });
 
-    await test.step('spending rules are already locked', async () => {
-      await lockRulesForTest(page);
-      await expect(page.getByText('Locked on ENS')).toBeVisible();
-    });
-
-    await test.step('simulate the poisoned invoice that gets flagged', async () => {
-      await page.goto('/activity');
-      await page.getByRole('button', { name: 'Simulate poisoned invoice' }).click();
-      await expect(page.getByText('Flagged', { exact: true })).toBeVisible({ timeout: 60_000 });
-    });
-
-    await test.step('file a claim and confirm the real backend created it', async () => {
-      await page.goto('/claims');
-
-      const claimCreated = page.waitForResponse(
-        (response) => response.url().endsWith('/api/claims') && response.request().method() === 'POST'
-      );
-      await page.getByRole('button', { name: /File a Claim/i }).click();
-      const response = await claimCreated;
-      expect(response.status()).toBe(201);
-
-      // The real proof: a claim card rendered on screen using the id the real backend
-      // just issued (`claim-N`) — never the old client-invented `c1` format.
-      await expect(page.getByText(/^#claim-\d+ Acme Corp payment$/)).toBeVisible();
-      await expect(page.getByText('Live Selfie Check required')).toBeVisible();
-    });
-  });
-});
+  await page.goto('/claims');
+  const claimCreated = page.waitForResponse(
+    (response) => response.url().endsWith('/api/claims') && response.request().method() === 'POST'
+  );
+  await page.getByRole('button', { name: /File a Claim/i }).click();
+  const response = await claimCreated;
+  expect(response.status()).toBe(201);
+}
 
 // A throwaway (not the real registered) but structurally valid secp256k1 key and
 // correctly-shaped rp_id — the widget does real client-side format validation, and
@@ -86,30 +67,13 @@ const VALID_REQUEST_RESPONSE = {
   },
 };
 
-/**
- * Drives a fresh claim into "awaiting identity" — lock the rules, simulate the poisoned
- * invoice, file the claim — the same three steps a person would take before ever seeing
- * the Selfie Check modal. Each test gets its own isolated browser context (no shared
- * localStorage), so this always starts from the seed state.
- */
-async function fileAClaim(page: Page) {
-  await lockRulesForTest(page);
-
-  await page.goto('/activity');
-  await page.getByRole('button', { name: 'Simulate poisoned invoice' }).click();
-  // TECH-607 made this a real Hedera + x402 payment round trip, not an instant
-  // client-side dispatch — wait for the real flagged row before moving on.
-  await expect(page.getByText('Flagged', { exact: true })).toBeVisible({ timeout: 60_000 });
-
-  await page.goto('/claims');
-  await page.getByRole('button', { name: /File a Claim/i }).click();
-}
-
-test.describe('Guardian completes the identity check', () => {
-  test.beforeEach(async ({ page }) => {
-    // fileAClaim's poisoned-invoice step is a real Hedera + x402 payment round trip, not
-    // an instant client-side dispatch — well beyond Playwright's 30s default.
-    test.setTimeout(90_000);
+test.describe('AP controller files a claim, then Guardian completes the identity check', () => {
+  test('a filed claim needs a real live identity check, which calls the real backend on success and fails safe on error', async ({
+    page,
+  }) => {
+    // Two real Hedera + x402 payment round trips (one per claim filed below) — well
+    // beyond Playwright's 30s default.
+    test.setTimeout(180_000);
 
     // Defense-in-depth: the widget shouldn't need to reach World's real servers with a
     // fake app_id at all (confirmed — it rejects synthetic data during its own local
@@ -117,49 +81,67 @@ test.describe('Guardian completes the identity check', () => {
     // regardless of that internal behavior.
     await page.route('**://*.worldcoin.org/**', (route) => route.abort());
     await page.route('**://*.world.org/**', (route) => route.abort());
-  });
 
-  test('clicking "Start face scan" calls the real backend instead of running the old fake timer', async ({
-    page,
-  }) => {
-    let requestWasCalled = false;
-    await page.route('**/api/world/request', (route) => {
-      requestWasCalled = true;
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(VALID_REQUEST_RESPONSE) });
+    await test.step('spending rules are already locked', async () => {
+      await lockRulesForTest(page);
+      await expect(page.getByText('Locked on ENS')).toBeVisible();
     });
 
-    await fileAClaim(page);
-    await page.getByRole('button', { name: 'Start face scan' }).click();
+    await test.step('file a claim and confirm the real backend created it', async () => {
+      await simulatePoisonedInvoiceAndFileClaim(page);
 
-    // The fake timer never called any backend at all — proving this one did is the
-    // real signal here. (The full live flow — real QR, real scan, real verification —
-    // is confirmed working by hand against a real device; see the note at the bottom
-    // of this file for why it isn't automated.)
-    await expect.poll(() => requestWasCalled).toBe(true);
-    await expect(page.getByText('Scanning face… hold still')).toHaveCount(0);
-  });
+      // The real proof: a claim card rendered on screen using the id the real backend
+      // just issued (`claim-N`) — never the old client-invented `c1` format.
+      await expect(page.getByText(/^#claim-\d+ Acme Corp payment$/)).toBeVisible();
+      await expect(page.getByText('Live Selfie Check required')).toBeVisible();
+    });
 
-  test('when the identity check can\'t start, a real error is shown and the claim stays "awaiting identity"', async ({
-    page,
-  }) => {
-    await page.route('**/api/world/request', (route) =>
-      route.fulfill({
-        status: 503,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          error: 'World ID is not configured yet — missing app_id, rp_id, or signing key.',
-        }),
-      })
-    );
+    await test.step('clicking "Start face scan" calls the real backend instead of running the old fake timer', async () => {
+      let requestWasCalled = false;
+      await page.route('**/api/world/request', (route) => {
+        requestWasCalled = true;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(VALID_REQUEST_RESPONSE) });
+      });
 
-    await fileAClaim(page);
-    await page.getByRole('button', { name: 'Start face scan' }).click();
+      await page.getByRole('button', { name: 'Start face scan' }).click();
 
-    await expect(page.getByText(/not configured yet/i)).toBeVisible();
-    await page.getByRole('button', { name: 'Close' }).click();
+      // The fake timer never called any backend at all — proving this one did is the
+      // real signal here. (The full live flow — real QR, real scan, real verification —
+      // is confirmed working by hand against a real device; see the note at the bottom
+      // of this file for why it isn't automated.)
+      await expect.poll(() => requestWasCalled).toBe(true);
+      await expect(page.getByText('Scanning face… hold still')).toHaveCount(0);
 
-    // Never falls back to fake success — the claim is still waiting on a real check.
-    await expect(page.getByRole('button', { name: 'Start face scan' })).toBeVisible();
+      await page.unroute('**/api/world/request');
+    });
+
+    await test.step('when the identity check can\'t start on a second claim, a real error is shown and the claim stays "awaiting identity"', async () => {
+      // A fresh claim from a cleared localStorage, rather than reusing the one above —
+      // its identity check is already mid-flight from the previous step, so reusing it
+      // would mean fighting over which "Start face scan" button on screen belongs to
+      // which claim instead of testing the error path cleanly.
+      await page.evaluate(() => localStorage.clear());
+      await lockRulesForTest(page);
+
+      await page.route('**/api/world/request', (route) =>
+        route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            error: 'World ID is not configured yet — missing app_id, rp_id, or signing key.',
+          }),
+        })
+      );
+
+      await simulatePoisonedInvoiceAndFileClaim(page);
+      await page.getByRole('button', { name: 'Start face scan' }).click();
+
+      await expect(page.getByText(/not configured yet/i)).toBeVisible();
+      await page.getByRole('button', { name: 'Close' }).click();
+
+      // Never falls back to fake success — the claim is still waiting on a real check.
+      await expect(page.getByRole('button', { name: 'Start face scan' })).toBeVisible();
+    });
   });
 });
 
