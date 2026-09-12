@@ -1,11 +1,14 @@
-import { TransferTransaction, Hbar } from '@hiero-ledger/sdk';
-import { fetchVendorPaymentHistory, fetchAccountBalance } from '../hedera/mirror-node.js';
+import { TransferTransaction, TokenId } from '@hiero-ledger/sdk';
+import { fetchVendorPaymentHistory, fetchTokenBalance } from '../hedera/mirror-node.js';
 import { readApprovedAccount } from '../ens/read-rules.js';
 import { judgeClaim } from '../investigator/judge-claim.js';
 import { authorizePayout } from '../payout/authorize-payout.js';
 import { getReservePoolClient, getReservePoolAccountId, getPayableAgentAccountId } from '../hedera/client.js';
 import { logPaymentToHcs } from '../hedera/hcs.js';
-import { VENDOR_TRANSFER_TINYBARS } from './activity.js';
+
+// mUSDC (server/scripts/setup-musdc.mjs) has 2 decimals — a claim's whole-dollar amount
+// converts to its smallest unit by multiplying by 100, same as real USDC cents.
+const MUSDC_DECIMALS = 100;
 
 const claims = [];
 let nextClaimId = 1;
@@ -60,13 +63,14 @@ export function recordPayout(id, { payoutTxHash }) {
 }
 
 /** Executes the real Hedera transfer reimbursing Northbeam: reserve pool → PayableAgent's
- *  own account, for the exact fixed amount it originally lost. */
-async function executePayoutTransfer() {
+ *  own account, in real mUSDC equal to the exact real dollar amount it originally lost. */
+async function executePayoutTransfer(amount) {
   const client = getReservePoolClient();
-  const tinybars = VENDOR_TRANSFER_TINYBARS;
+  const tokenId = TokenId.fromString(process.env.HEDERA_MUSDC_TOKEN_ID);
+  const smallestUnits = Math.round(amount * MUSDC_DECIMALS);
   const tx = new TransferTransaction()
-    .addHbarTransfer(getReservePoolAccountId(), Hbar.fromTinybars(`-${tinybars}`))
-    .addHbarTransfer(getPayableAgentAccountId(), Hbar.fromTinybars(tinybars));
+    .addTokenTransfer(tokenId, getReservePoolAccountId(), -smallestUnits)
+    .addTokenTransfer(tokenId, getPayableAgentAccountId(), smallestUnits);
   const submitted = await tx.execute(client);
   await submitted.getReceipt(client);
   return submitted.transactionId.toString();
@@ -118,17 +122,18 @@ export function registerClaimRoutes(app) {
       });
       authorizePayout({ claim, rederivedVerdict, rederivedReasoning });
 
-      const poolBalance = await fetchAccountBalance(getReservePoolAccountId());
-      if (poolBalance < Number(VENDOR_TRANSFER_TINYBARS)) {
+      const requiredSmallestUnits = Math.round(claim.amount * MUSDC_DECIMALS);
+      const poolBalance = await fetchTokenBalance(getReservePoolAccountId(), process.env.HEDERA_MUSDC_TOKEN_ID);
+      if (poolBalance < requiredSmallestUnits) {
         throw new Error('Reserve pool balance is too low to cover this payout.');
       }
 
-      const payoutTxHash = await executePayoutTransfer();
+      const payoutTxHash = await executePayoutTransfer(claim.amount);
       await logPaymentToHcs({
         kind: 'claim-payout',
         claimId: claim.id,
         accountId: getPayableAgentAccountId(),
-        amount: VENDOR_TRANSFER_TINYBARS,
+        amount: requiredSmallestUnits,
         payoutTxHash,
       });
 
