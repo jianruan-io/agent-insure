@@ -88,6 +88,21 @@ test.describe('PayableAgent pays vendors for real on Hedera, with a real x402 co
       // The real proof: the invoice's real $500 moved as exactly 500.00 real mUSDC, not a
       // fixed, unrelated amount.
       await expectRealTokenAmount(body.paymentTxHash, body.amount);
+
+      // Independent proof, on Hedera's own public explorer — not our app's word for it.
+      const feeUrl = await feeLink.getAttribute('href');
+      const feeExplorerPage = await page.context().newPage();
+      await feeExplorerPage.goto(feeUrl!);
+      await expect(feeExplorerPage.getByText('SUCCESS')).toBeVisible({ timeout: 15_000 });
+      await expect(feeExplorerPage.getByText('CRYPTO TRANSFER')).toBeVisible();
+      await feeExplorerPage.close();
+
+      const paymentUrl = await paymentTxLink.getAttribute('href');
+      const paymentExplorerPage = await page.context().newPage();
+      await paymentExplorerPage.goto(paymentUrl!);
+      await expect(paymentExplorerPage.getByText('SUCCESS')).toBeVisible({ timeout: 15_000 });
+      await expect(paymentExplorerPage.getByText('CRYPTO TRANSFER')).toBeVisible();
+      await paymentExplorerPage.close();
     });
 
     await test.step('simulate a poisoned invoice and confirm PayableAgent was genuinely fooled, with real proof of the wrong destination', async () => {
@@ -123,6 +138,15 @@ test.describe('PayableAgent pays vendors for real on Hedera, with a real x402 co
       // Even the poisoned, wrongly-destined payment moves the real dollar-equal amount —
       // the attack diverts the destination, not the value.
       await expectRealTokenAmount(body.paymentTxHash, body.amount);
+
+      // Independent proof, on Hedera's own public explorer — even the fraudulent payment
+      // is a real, permanent transaction anyone can check for themselves.
+      const paymentUrl = await paymentTxLink.getAttribute('href');
+      const explorerPage = await page.context().newPage();
+      await explorerPage.goto(paymentUrl!);
+      await expect(explorerPage.getByText('SUCCESS')).toBeVisible({ timeout: 15_000 });
+      await expect(explorerPage.getByText('CRYPTO TRANSFER')).toBeVisible();
+      await explorerPage.close();
 
       // The concealed instruction itself, on screen — the real document PayableAgent read,
       // not a description of it.
