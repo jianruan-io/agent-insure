@@ -3,7 +3,9 @@ import { fileURLToPath } from 'node:url';
 import { createWalletClient, createPublicClient, http, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { sepolia } from 'viem/chains';
-import { normalizePrivateKey } from '../../scripts/normalize-private-key.mjs';
+import { normalizePrivateKey } from '../business/scripts/normalize-private-key.mjs';
+
+test.use({ baseURL: 'http://localhost:6323' });
 
 /**
  * No mocking of the ENS/chain interaction itself — every call this test drives hits the
@@ -14,12 +16,12 @@ import { normalizePrivateKey } from '../../scripts/normalize-private-key.mjs';
  * `SEPOLIA_PRIVATE_KEY` PayableAgent's wallet uses live (root `.env.local`). Every
  * signature, transaction, and confirmation that flows through it is real — this only
  * substitutes for the human clicking "Confirm" in a wallet UI, the same category of thing
- * `selfie-check.spec.ts` documents for a physical device Playwright can't drive either.
+ * p3-file-the-claim.spec.ts documents for a physical device Playwright can't drive either.
  * Added 2026-09-09 for TECH-606.
  */
 
 try {
-  process.loadEnvFile(fileURLToPath(new URL('../../../../.env.local', import.meta.url)));
+  process.loadEnvFile(fileURLToPath(new URL('../../.env.local', import.meta.url)));
 } catch {
   // No root .env.local — the test.skip just below reports this clearly instead.
 }

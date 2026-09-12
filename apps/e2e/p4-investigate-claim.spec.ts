@@ -1,11 +1,14 @@
 import { test, expect } from '@playwright/test';
 
+test.use({ baseURL: 'http://localhost:6324' });
+
 const API_URL = 'http://localhost:8787';
 
 /**
  * Seeds a real disputed claim directly against the server, not by re-driving Northbeam's
- * own UI — filing a claim is a different Goal (g-notice-file). This test stays scoped to
- * InvestigatorAgent's own real judgment: real Mirror Node history + real ENS-locked rules.
+ * own UI — filing a claim is a different Goal (p3-file-the-claim.spec.ts). This test stays
+ * scoped to InvestigatorAgent's own real judgment: real Mirror Node history + real
+ * ENS-locked rules.
  */
 async function seedClaim(request: import('@playwright/test').APIRequestContext, account: string, activityId: string) {
   const response = await request.post(`${API_URL}/api/claims`, {
@@ -17,8 +20,8 @@ async function seedClaim(request: import('@playwright/test').APIRequestContext, 
 
 /**
  * No mocking anywhere in this flow — Run Investigation hits the real running Express server
- * (started for real by playwright.config.ts's webServer), which itself queries the real
- * Hedera Mirror Node for this vendor's payment history and reads the real, ENS-locked
+ * (started for real by the root playwright.config.ts's webServer), which itself queries the
+ * real Hedera Mirror Node for this vendor's payment history and reads the real, ENS-locked
  * spending rules from Sepolia. A passing run is proof InvestigatorAgent's rule-based verdict
  * is real, not proof a mock was set up right.
  */
