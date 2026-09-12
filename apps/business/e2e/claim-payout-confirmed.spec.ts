@@ -79,7 +79,7 @@ test.describe("Northbeam's portal notices a real payout and shows it resolved", 
       // Real proof rendering live, picked up by Northbeam's own polling — not a page reload.
       await expect(page.getByText('Approved — $500 returned')).toBeVisible({ timeout: 15_000 });
       const txLink = page.getByRole('link', {
-        name: new RegExp(`Hedera tx: ${payout.payoutTxHash.replace(/[.@]/g, '\\$&')}`),
+        name: new RegExp(`Hedera tx \\(.*\\): ${payout.payoutTxHash.replace(/[.@]/g, '\\$&')}`),
       });
       await expect(txLink).toBeVisible();
       await expect(txLink).toHaveAttribute('href', HASHSCAN_TX_URL);

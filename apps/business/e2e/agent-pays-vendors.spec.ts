@@ -2,6 +2,33 @@ import { test, expect, type Page } from '@playwright/test';
 
 const STORAGE_KEY = 'agent-insure-business-v1';
 const HASHSCAN_TX_URL = /^https:\/\/hashscan\.io\/testnet\/transaction\/\d+\.\d+\.\d+@\d+\.\d+$/;
+const MIRROR_NODE_URL = 'https://testnet.mirrornode.hedera.com';
+
+/** Converts the Hedera SDK's own transaction id format into the one Mirror Node's REST API expects. */
+function toMirrorNodeTxId(sdkTransactionId: string): string {
+  const [account, timestamp] = sdkTransactionId.split('@');
+  return `${account}-${timestamp.replace('.', '-')}`;
+}
+
+/**
+ * TECH-663's real proof: the invoice's real dollar amount now moves as that exact real
+ * mUSDC amount, not a fixed figure decoupled from what's on screen. Reads straight from
+ * Hedera Mirror Node — retried briefly since indexing lags consensus by a couple of seconds.
+ */
+async function expectRealTokenAmount(sdkTransactionId: string, expectedDollarAmount: number) {
+  const expectedSmallestUnits = Math.round(expectedDollarAmount * 100);
+  const mirrorNodeId = toMirrorNodeTxId(sdkTransactionId);
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const response = await fetch(`${MIRROR_NODE_URL}/api/v1/transactions/${mirrorNodeId}`);
+    if (response.ok) {
+      const body = await response.json();
+      const transfer = body.transactions?.[0]?.token_transfers?.find((t: { amount: number }) => t.amount === expectedSmallestUnits);
+      if (transfer) return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+  throw new Error(`Mirror Node never showed a real ${expectedDollarAmount}-dollar-equal mUSDC transfer for ${sdkTransactionId}`);
+}
 
 /**
  * Same rationale as claim-filing.spec.ts: this test's Goal is the real payment pipeline,
@@ -44,6 +71,7 @@ test.describe('PayableAgent pays vendors for real on Hedera, with a real x402 co
       await page.getByRole('button', { name: 'Simulate normal invoice' }).click();
       const response = await simulated;
       expect(response.status()).toBe(200);
+      const body = await response.json();
 
       const row = page.locator('tbody tr').first();
       await expect(row.getByText('OK', { exact: true })).toBeVisible({ timeout: 60_000 });
@@ -53,9 +81,13 @@ test.describe('PayableAgent pays vendors for real on Hedera, with a real x402 co
 
       await row.getByRole('button', { name: 'reason' }).click();
       const reasoningRow = row.locator('xpath=following-sibling::tr[1]');
-      const paymentTxLink = reasoningRow.getByRole('link', { name: /^vendor payment tx:/ });
+      const paymentTxLink = reasoningRow.getByRole('link', { name: /^vendor payment tx \(/ });
       await expect(paymentTxLink).toHaveAttribute('href', HASHSCAN_TX_URL);
       await expect(reasoningRow.getByText(/logged to Hedera Consensus Service · seq #\d+/)).toBeVisible();
+
+      // The real proof: the invoice's real $500 moved as exactly 500.00 real mUSDC, not a
+      // fixed, unrelated amount.
+      await expectRealTokenAmount(body.paymentTxHash, body.amount);
     });
 
     await test.step('simulate a poisoned invoice and confirm PayableAgent was genuinely fooled, with real proof of the wrong destination', async () => {
@@ -84,9 +116,13 @@ test.describe('PayableAgent pays vendors for real on Hedera, with a real x402 co
       const reasoningRow = row.locator('xpath=following-sibling::tr[1]');
       await expect(reasoningRow.getByText(body.reasoning)).toBeVisible();
 
-      const paymentTxLink = reasoningRow.getByRole('link', { name: /^vendor payment tx:/ });
+      const paymentTxLink = reasoningRow.getByRole('link', { name: /^vendor payment tx \(/ });
       await expect(paymentTxLink).toHaveAttribute('href', HASHSCAN_TX_URL);
       await expect(reasoningRow.getByText(/logged to Hedera Consensus Service · seq #\d+/)).toBeVisible();
+
+      // Even the poisoned, wrongly-destined payment moves the real dollar-equal amount —
+      // the attack diverts the destination, not the value.
+      await expectRealTokenAmount(body.paymentTxHash, body.amount);
 
       // The concealed instruction itself, on screen — the real document PayableAgent read,
       // not a description of it.
