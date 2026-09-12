@@ -1,6 +1,69 @@
 import { test, expect, type Page } from '@playwright/test';
 import { signRequest } from '@worldcoin/idkit-core/signing';
 
+test.use({ baseURL: 'http://localhost:6323' });
+
+const STORAGE_KEY = 'agent-insure-business-v1';
+
+/**
+ * Seeds `rules.locked` directly in localStorage instead of driving the real ENS
+ * write-then-lock flow through the UI. This test's Goal is claim filing and the identity
+ * check, not the ENS lock itself — p1-lock-agent-payment-rules.spec.ts is the one place
+ * that proves the real on-chain lock, with no mocking of the chain interaction. Re-driving
+ * that same real, permanent, gas-costing flow here on every run would be slow and would
+ * re-test a different Goal's mechanism, not this one.
+ */
+async function lockRulesForTest(page: Page) {
+  await page.goto('/rules'); // first load seeds localStorage via the store's own seedState()
+  await page.evaluate((key) => {
+    const raw = JSON.parse(localStorage.getItem(key) ?? '{}');
+    raw.rules = { ...raw.rules, locked: true };
+    localStorage.setItem(key, JSON.stringify(raw));
+  }, STORAGE_KEY);
+  await page.reload();
+}
+
+/**
+ * No mocking here, on either side — unlike the identity-check tests below, which mock the
+ * World boundary deliberately. `POST /api/claims` hits the real Express server (started for
+ * real by the root playwright.config.ts's webServer), so a passing run is proof the wiring
+ * works, not proof a mock was set up correctly.
+ */
+test.describe('AP controller files a claim against a real backend record', () => {
+  test('filing a claim creates a real backend record and renders it with the server-issued id', async ({ page }) => {
+    // TECH-607 made the poisoned-invoice simulation a real Hedera + x402 payment round
+    // trip, not an instant client-side dispatch — well beyond Playwright's 30s default.
+    test.setTimeout(90_000);
+
+    await test.step('spending rules are already locked', async () => {
+      await lockRulesForTest(page);
+      await expect(page.getByText('Locked on ENS')).toBeVisible();
+    });
+
+    await test.step('simulate the poisoned invoice that gets flagged', async () => {
+      await page.goto('/activity');
+      await page.getByRole('button', { name: 'Simulate poisoned invoice' }).click();
+      await expect(page.getByText('Flagged', { exact: true })).toBeVisible({ timeout: 60_000 });
+    });
+
+    await test.step('file a claim and confirm the real backend created it', async () => {
+      await page.goto('/claims');
+
+      const claimCreated = page.waitForResponse(
+        (response) => response.url().endsWith('/api/claims') && response.request().method() === 'POST'
+      );
+      await page.getByRole('button', { name: /File a Claim/i }).click();
+      const response = await claimCreated;
+      expect(response.status()).toBe(201);
+
+      // The real proof: a claim card rendered on screen using the id the real backend
+      // just issued (`claim-N`) — never the old client-invented `c1` format.
+      await expect(page.getByText(/^#claim-\d+ Acme Corp payment$/)).toBeVisible();
+      await expect(page.getByText('Live Selfie Check required')).toBeVisible();
+    });
+  });
+});
+
 // A throwaway (not the real registered) but structurally valid secp256k1 key and
 // correctly-shaped rp_id — the widget does real client-side format validation, and
 // rejects an obviously-fake payload before ever rendering. This is only enough to get
@@ -23,24 +86,6 @@ const VALID_REQUEST_RESPONSE = {
   },
 };
 
-const STORAGE_KEY = 'agent-insure-business-v1';
-
-/**
- * Seeds `rules.locked` directly in localStorage instead of driving the real ENS
- * write-then-lock flow through the UI — this test's Goal is the identity check, not the
- * ENS lock itself, which TECH-606's `lock-rules.spec.ts` proves for real with no mocking
- * of the chain interaction.
- */
-async function lockRulesForTest(page: Page) {
-  await page.goto('/rules'); // first load seeds localStorage via the store's own seedState()
-  await page.evaluate((key) => {
-    const raw = JSON.parse(localStorage.getItem(key) ?? '{}');
-    raw.rules = { ...raw.rules, locked: true };
-    localStorage.setItem(key, JSON.stringify(raw));
-  }, STORAGE_KEY);
-  await page.reload();
-}
-
 /**
  * Drives a fresh claim into "awaiting identity" — lock the rules, simulate the poisoned
  * invoice, file the claim — the same three steps a person would take before ever seeing
@@ -62,8 +107,8 @@ async function fileAClaim(page: Page) {
 
 test.describe('Guardian completes the identity check', () => {
   test.beforeEach(async ({ page }) => {
-    // TECH-607 made fileAClaim's poisoned-invoice step a real Hedera + x402 payment round
-    // trip, not an instant client-side dispatch — well beyond Playwright's 30s default.
+    // fileAClaim's poisoned-invoice step is a real Hedera + x402 payment round trip, not
+    // an instant client-side dispatch — well beyond Playwright's 30s default.
     test.setTimeout(90_000);
 
     // Defense-in-depth: the widget shouldn't need to reach World's real servers with a

@@ -30,10 +30,105 @@ async function expectRealTokenAmount(sdkTransactionId: string, expectedDollarAmo
   throw new Error(`Mirror Node never showed a real ${expectedDollarAmount}-dollar-equal mUSDC transfer for ${sdkTransactionId}`);
 }
 
+const STORAGE_KEY = 'agent-insure-business-v1';
+
+/**
+ * Seeds a real, already-investigated claim directly against the server, then injects a
+ * matching, already-`submitted` ClaimEntry into Northbeam's own local state. Filing a claim
+ * and completing its selfie check are different Goals, already proven for real in
+ * p3-file-the-claim.spec.ts — re-driving that whole (expensive, multi-minute) flow here
+ * would test that Goal again, not this one: whether Northbeam's own portal notices a real
+ * payout once it happens.
+ */
+async function seedSubmittedClaim(request: import('@playwright/test').APIRequestContext) {
+  const created = await request.post(`${API_URL}/api/claims`, {
+    data: { vendor: 'Acme Corp', amount: 500, activityId: 'e2e-payout-confirmed', account: '0.0.10465722' },
+  });
+  expect(created.status()).toBe(201);
+  const claim = await created.json();
+
+  const investigated = await request.post(`${API_URL}/api/claims/${claim.id}/investigate`);
+  expect(investigated.status()).toBe(200);
+  const body = await investigated.json();
+  expect(body.verdict).toBe('FRAUD');
+
+  return claim.id as string;
+}
+
+/**
+ * No mocking anywhere in this flow — Northbeam's own polling hits the real running Express
+ * server, which itself reflects a real Hedera transfer PayoutAgent actually executed. A
+ * passing run is proof Northbeam genuinely notices real money moving, not proof a mock was
+ * set up right.
+ */
+test.describe("Northbeam's portal notices a real payout and shows it resolved", () => {
+  test.use({ baseURL: 'http://localhost:6323' });
+
+  test('a claim flips from Submitted to Approved, with the real transaction linked to HashScan, once Agent Insure actually pays it', async ({
+    page,
+    request,
+  }) => {
+    // Northbeam polls every 3s; the payout itself is a real Hedera transfer + HCS log.
+    test.setTimeout(60_000);
+
+    const claimId = await seedSubmittedClaim(request);
+
+    await test.step("polls the real claim record and shows it resolved once Agent Insure actually pays it", async () => {
+      await page.goto('/claims'); // first load seeds localStorage via the store's own seedState()
+      await page.evaluate(
+        ({ key, claimId }) => {
+          const raw = JSON.parse(localStorage.getItem(key) ?? '{}');
+          raw.claims = [
+            ...(raw.claims ?? []),
+            {
+              id: claimId,
+              vendor: 'Acme Corp',
+              amount: 500,
+              time: 'Just now',
+              seed: false,
+              status: 'submitted',
+              reasoning: 'Does not match the locked vendor list.',
+              payoutTxHash: null,
+            },
+          ];
+          localStorage.setItem(key, JSON.stringify(raw));
+        },
+        { key: STORAGE_KEY, claimId }
+      );
+      await page.reload();
+
+      await expect(page.getByText('Submitted — now with Agent Insure for investigation')).toBeVisible();
+
+      // Agent Insure actually pays the claim for real, independently of anything Northbeam's
+      // UI does — exactly what would happen if a different company resolved it.
+      const paidOut = await request.post(`${API_URL}/api/claims/${claimId}/payout`);
+      expect(paidOut.status()).toBe(200);
+      const payout = await paidOut.json();
+      expect(payout.payoutTxHash).toBeTruthy();
+
+      // Real proof rendering live, picked up by Northbeam's own polling — not a page reload.
+      await expect(page.getByText('Approved — $500 returned')).toBeVisible({ timeout: 15_000 });
+      const txLink = page.getByRole('link', {
+        name: new RegExp(`Hedera tx \\(.*\\): ${payout.payoutTxHash.replace(/[.@]/g, '\\$&')}`),
+      });
+      await expect(txLink).toBeVisible();
+      await expect(txLink).toHaveAttribute('href', HASHSCAN_TX_URL);
+
+      // Independent proof, on Hedera's own public explorer — not Agent Insure's word for it.
+      const payoutUrl = await txLink.getAttribute('href');
+      const explorerPage = await page.context().newPage();
+      await explorerPage.goto(payoutUrl!);
+      await expect(explorerPage.getByText('SUCCESS')).toBeVisible({ timeout: 15_000 });
+      await expect(explorerPage.getByText('CRYPTO TRANSFER')).toBeVisible();
+      await explorerPage.close();
+    });
+  });
+});
+
 /**
  * Seeds a real disputed claim directly and investigates it for real — the precondition this
- * Goal needs (a signed verdict), not the thing under test. g-investigate's own test already
- * proves InvestigatorAgent's verdict live.
+ * Goal needs (a signed verdict), not the thing under test. p4-investigate-claim.spec.ts
+ * already proves InvestigatorAgent's verdict live.
  */
 async function seedInvestigatedClaim(request: import('@playwright/test').APIRequestContext, account: string, activityId: string) {
   const created = await request.post(`${API_URL}/api/claims`, {
@@ -55,6 +150,8 @@ async function seedInvestigatedClaim(request: import('@playwright/test').APIRequ
  * are both real, not proof a mock was set up right.
  */
 test.describe("PayoutAgent independently verifies the verdict and executes a real Hedera payout", () => {
+  test.use({ baseURL: 'http://localhost:6324' });
+
   test('pays out a real FRAUD claim on Hedera, and refuses to pay a CLEARED one', async ({ page, request }) => {
     // Each payout re-runs the full real investigation (Mirror Node + ENS) plus a real
     // Hedera transfer and HCS log — well beyond Playwright's 30s default.
