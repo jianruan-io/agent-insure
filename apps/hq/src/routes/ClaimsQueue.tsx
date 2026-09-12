@@ -80,7 +80,7 @@ function ClaimDetail({ claim, onInvestigate, onPay }: ClaimDetailProps) {
               rel="noreferrer"
               className="block rounded-lg bg-muted px-3 py-2 font-mono text-xs text-muted-foreground underline"
             >
-              Hedera tx: {claim.payoutTxHash}
+              Hedera tx ({money(claim.amount)} mUSDC): {claim.payoutTxHash}
             </a>
           ) : claim.verdict === 'FRAUD' ? (
             <Button size="sm" onClick={() => onPay(claim.id)}>
