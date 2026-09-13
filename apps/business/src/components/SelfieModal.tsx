@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { IDKitRequestWidget, selfieCheckLegacy, type IDKitResult } from '@worldcoin/idkit';
+import { useEffect, useRef, useState } from 'react';
+import { IDKit, selfieCheckLegacy, type IDKitRequest } from '@worldcoin/idkit-core';
+import QRCode from 'qrcode';
 import { Button } from './ui/button.js';
 
 /** Hand-drawn stroke SVG matching the approved Northbeam Portal prototype's close icon —
@@ -36,71 +37,97 @@ type Status = 'loading' | 'ready' | 'verifying' | 'verified' | 'error';
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8787';
 
 /**
- * The Live Selfie Check modal opened from an `awaiting-identity` claim card. Replaces the
- * old `setTimeout` fake with World's real IDKit widget: the backend signs a fresh connect
- * request (`POST /api/world/request`), the widget renders the actual World connect flow,
- * and every returned proof is independently checked with the backend (`POST
+ * The Live Selfie Check modal opened from an `awaiting-identity` claim card. Talks to
+ * World's real API directly through `@worldcoin/idkit-core`'s framework-agnostic
+ * `createRequest()` builder — not the `IDKitRequestWidget` React component, whose bundled
+ * WASM module fails to load under Vite's dev server (an SDK/tooling bug unrelated to World's
+ * own servers: confirmed zero network requests ever reach worldcoin.org/world.org before it
+ * fails). `createRequest()` needs no WASM at all; it just returns a real, signed
+ * `connectorURI` to render as a QR code (any plain QR library works — no widget required)
+ * and a `pollUntilCompletion()` promise that resolves once the real device completes the
+ * scan. Every returned proof is still independently checked with the backend (`POST
  * /api/world/verify`) before `onComplete` ever fires — a failed or not-yet-enabled check
  * shows a real error instead of silently succeeding.
  */
 export function SelfieModal({ onClose, onComplete }: SelfieModalProps) {
   const [status, setStatus] = useState<Status>('loading');
   const [errorMessage, setErrorMessage] = useState('');
-  const [requestConfig, setRequestConfig] = useState<WorldRequestConfig | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
-    let cancelled = false;
+    cancelledRef.current = false;
 
-    async function loadRequest() {
+    async function run() {
+      let request: IDKitRequest;
       try {
         const response = await fetch(`${API_URL}/api/world/request`, { method: 'POST' });
-        const body = await response.json();
-        if (!response.ok) throw new Error(body.error || 'Could not start the identity check.');
-        if (!cancelled) {
-          setRequestConfig(body);
-          setStatus('ready');
-        }
+        const config = (await response.json()) as WorldRequestConfig & { error?: string };
+        if (!response.ok) throw new Error(config.error || 'Could not start the identity check.');
+        if (cancelledRef.current) return;
+
+        request = await IDKit.request({
+          app_id: config.app_id,
+          action: config.action,
+          rp_context: config.rp_context,
+          environment: config.environment,
+          allow_legacy_proofs: true,
+        }).preset(selfieCheckLegacy());
+        if (cancelledRef.current) return;
+
+        const dataUrl = await QRCode.toDataURL(request.connectorURI, { width: 240, margin: 1 });
+        if (cancelledRef.current) return;
+        setQrDataUrl(dataUrl);
+        setStatus('ready');
       } catch (error) {
-        if (!cancelled) {
+        if (!cancelledRef.current) {
           setErrorMessage(error instanceof Error ? error.message : 'Could not start the identity check.');
+          setStatus('error');
+        }
+        return;
+      }
+
+      // World's own SDK reports exactly why a check failed via `error` (a fixed, documented
+      // set of reasons — e.g. "world_id_4_not_available", "connection_failed") — surfaced
+      // directly rather than hidden behind one generic message.
+      const completion = await request.pollUntilCompletion();
+      if (cancelledRef.current) return;
+      if (!completion.success) {
+        // eslint-disable-next-line no-console
+        console.error('World ID identity check failed', { errorCode: completion.error, debugReport: request.getDebugReport() });
+        setErrorMessage(`Identity check failed: ${completion.error}`);
+        setStatus('error');
+        return;
+      }
+
+      setStatus('verifying');
+      try {
+        const verifyResponse = await fetch(`${API_URL}/api/world/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(completion.result),
+        });
+        const verifyBody = await verifyResponse.json();
+        if (cancelledRef.current) return;
+        if (!verifyResponse.ok || !verifyBody.verified) {
+          setErrorMessage(verifyBody.error || verifyBody.reason || 'Identity check failed — please try again.');
+          setStatus('error');
+          return;
+        }
+        setStatus('verified');
+      } catch (error) {
+        if (!cancelledRef.current) {
+          setErrorMessage(error instanceof Error ? error.message : 'Could not verify the identity check.');
           setStatus('error');
         }
       }
     }
 
-    void loadRequest();
+    void run();
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
     };
   }, []);
-
-  // Called by IDKit with the proof once the person completes the check. Resolving lets
-  // IDKit call onSuccess; throwing tells it the check failed — either way, the backend's
-  // answer is what decides, never the widget's own say-so.
-  async function handleVerify(result: IDKitResult) {
-    setStatus('verifying');
-    const response = await fetch(`${API_URL}/api/world/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(result),
-    });
-    const body = await response.json();
-    if (!response.ok || !body.verified) {
-      const message = body.error || body.reason || 'Identity check failed — please try again.';
-      setErrorMessage(message);
-      setStatus('error');
-      throw new Error(message);
-    }
-  }
-
-  function handleSuccess() {
-    setStatus('verified');
-  }
-
-  function handleWidgetError() {
-    setErrorMessage('Identity check failed — please try again.');
-    setStatus('error');
-  }
 
   return (
     <div
@@ -149,27 +176,13 @@ export function SelfieModal({ onClose, onComplete }: SelfieModalProps) {
               Cancel
             </Button>
           </>
-        ) : requestConfig ? (
+        ) : qrDataUrl ? (
           <>
             <div className="mb-4 text-sm text-muted-foreground">
               {status === 'verifying' ? 'Confirming your scan…' : 'Scan the code with the World app to continue.'}
             </div>
-            <IDKitRequestWidget
-              open
-              onOpenChange={(open) => {
-                if (!open && status !== 'verified') onClose();
-              }}
-              app_id={requestConfig.app_id}
-              action={requestConfig.action}
-              environment={requestConfig.environment}
-              rp_context={requestConfig.rp_context}
-              allow_legacy_proofs={true}
-              preset={selfieCheckLegacy()}
-              handleVerify={handleVerify}
-              onSuccess={handleSuccess}
-              onError={handleWidgetError}
-            />
-            <Button variant="outline" onClick={onClose} className="mt-3">
+            <img src={qrDataUrl} alt="World ID verification QR code" className="mx-auto mb-4 rounded-lg" width={240} height={240} />
+            <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
           </>

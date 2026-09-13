@@ -39,6 +39,13 @@ export function listClaims() {
   return claims;
 }
 
+/** Wipes the in-memory claims store — there's no database, so a long-running dev server
+ *  otherwise accumulates every claim ever filed across every demo run and e2e test. */
+export function resetClaims() {
+  claims.length = 0;
+  nextClaimId = 1;
+}
+
 function findClaim(id) {
   return claims.find((claim) => claim.id === id);
 }
@@ -84,6 +91,13 @@ export function registerClaimRoutes(app) {
 
   app.get('/api/claims', (_req, res) => {
     res.status(200).json(listClaims());
+  });
+
+  // Demo/test hygiene only — clears the unbounded in-memory store so a fresh recording
+  // isn't cluttered with claims left over from earlier runs.
+  app.delete('/api/claims', (_req, res) => {
+    resetClaims();
+    res.status(204).end();
   });
 
   app.post('/api/claims/:id/investigate', async (req, res) => {

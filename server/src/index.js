@@ -40,7 +40,9 @@ registerWorldRoutes(app);
 registerClaimRoutes(app);
 registerCoverageFeeRoute(app, {
   getRequirementParams: () => ({
-    amount: process.env.HEDERA_COVERAGE_FEE_AMOUNT || '10000000',
+    // mUSDC smallest units now (2 decimals) — see routes/activity.js's own
+    // COVERAGE_FEE_SMALLEST_UNITS comment for why the coverage fee moved off HBAR.
+    amount: process.env.HEDERA_COVERAGE_FEE_AMOUNT || '5',
     payToAccountId: process.env.HEDERA_RESERVE_POOL_ACCOUNT_ID,
   }),
 });

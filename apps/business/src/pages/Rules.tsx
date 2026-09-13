@@ -1,12 +1,18 @@
 import { useEffect } from 'react';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
-import { Card, CardContent } from '../components/ui/card.js';
 import { StatTile } from '../components/StatTile.js';
 import { useStore } from '../lib/store.js';
 
 function etherscanTxUrl(txHash: string): string {
   return `https://sepolia.etherscan.io/tx/${txHash}`;
+}
+
+// payableagent.agentinsure.eth is a real, registered ENS subname (its own subregistry was
+// deployed and attached to agentinsure.eth for this) — its Records tab shows the actual
+// written budgetCap/vendors values directly, independently of anything this app says.
+function ensNameExplorerUrl(): string {
+  return 'https://hackathon-deployment-portal-app.ens-cf.workers.dev/payableagent.agentinsure.eth/records';
 }
 
 const LOCK_BUTTON_LABEL: Record<string, string> = {
@@ -66,97 +72,99 @@ export function Rules() {
       <h1 className="mb-1 text-2xl font-bold">Spending Rules</h1>
       <p className="mb-5 text-sm text-muted-foreground">Sets PayableAgent’s enforceable spending scope.</p>
 
-      <Card>
-        <CardContent className="p-5">
-          <div className="mb-5 max-w-sm">
-            <StatTile label="Budget cap" value={money(rules.budgetCap)} caption="per transaction" />
-          </div>
+      <div className="mb-5 max-w-sm">
+        <StatTile label="Budget cap" value={money(rules.budgetCap)} caption="per transaction" />
+      </div>
 
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Approved vendors
-          </div>
-          <div className="mb-5 overflow-hidden rounded-lg border border-border">
-            <table className="w-full text-sm">
-              <tbody>
-                {rules.vendors.map((v) => (
-                  <tr key={v.account} className="border-b border-border/70">
-                    <td className="p-3 text-sm font-semibold">{v.name}</td>
-                    <td className="p-3 font-mono text-xs text-muted-foreground">{v.account}</td>
-                    <td className="p-3 text-right">
-                      <Badge variant="success">Approved</Badge>
-                    </td>
-                  </tr>
-                ))}
-                <tr>
-                  <td className="p-3 text-sm text-muted-foreground/70" colSpan={3}>
-                    + add vendor <span className="text-xs">(fixed for this demo)</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Approved vendors</div>
+      <div className="mb-5 overflow-hidden rounded-lg border border-border">
+        <table className="w-full text-sm">
+          <tbody>
+            {rules.vendors.map((v) => (
+              <tr key={v.account} className="border-b border-border/70">
+                <td className="p-3 text-sm font-semibold">{v.name}</td>
+                <td className="p-3 font-mono text-xs text-muted-foreground">{v.account}</td>
+                <td className="p-3 text-right">
+                  <Badge variant="success">Approved</Badge>
+                </td>
+              </tr>
+            ))}
+            <tr>
+              <td className="p-3 text-sm text-muted-foreground/70" colSpan={3}>
+                + add vendor <span className="text-xs">(fixed for this demo)</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-          {rules.locked ? (
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 rounded-lg bg-[var(--success)]/10 px-3 py-2 text-sm font-semibold text-[var(--success)]">
-                <CheckIcon /> Locked on ENS — cannot be silently changed <Badge variant="ens">ENS</Badge>
-              </div>
-              <div className="flex flex-col gap-0.5 pl-1 font-mono text-xs text-muted-foreground">
-                {rules.writeTxHash ? (
-                  <a
-                    className="underline decoration-dotted hover:text-foreground"
-                    href={etherscanTxUrl(rules.writeTxHash)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    write tx: {rules.writeTxHash.slice(0, 10)}…
-                  </a>
-                ) : null}
-                {rules.lockTxHash ? (
-                  <a
-                    className="underline decoration-dotted hover:text-foreground"
-                    href={etherscanTxUrl(rules.lockTxHash)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    lock tx: {rules.lockTxHash.slice(0, 10)}…
-                  </a>
-                ) : null}
-              </div>
-            </div>
-          ) : (
-            <div>
-              <Button onClick={() => void lockRules()} disabled={busy}>
-                {LOCK_BUTTON_LABEL[rules.lockStatus] ?? LOCK_BUTTON_LABEL.idle}
-              </Button>
-              {rules.lockStatus === 'written' && rules.writeTxHash ? (
-                <p className="mt-2 font-mono text-xs text-muted-foreground">
-                  <a
-                    className="underline decoration-dotted hover:text-foreground"
-                    href={etherscanTxUrl(rules.writeTxHash)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    write tx: {rules.writeTxHash.slice(0, 10)}…
-                  </a>{' '}
-                  — written, not yet locked
-                </p>
-              ) : null}
-              {rules.lockStatus === 'error' && rules.lockError ? (
-                <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-destructive">
-                  <Badge variant="destructive">Error</Badge> {rules.lockError}
-                </p>
-              ) : null}
-            </div>
-          )}
-
-          {!rules.locked ? (
-            <p className="mt-3 text-xs text-muted-foreground">
-              Not locked yet — simulating an attack on Activity stays disabled until these rules are locked.
+      {rules.locked ? (
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 rounded-lg bg-[var(--success)]/10 px-3 py-2 text-sm font-semibold text-[var(--success)]">
+            <CheckIcon /> Locked on ENS — cannot be silently changed <Badge variant="ens">ENS</Badge>
+          </div>
+          <div className="flex flex-col gap-0.5 pl-1 font-mono text-xs text-muted-foreground">
+            {rules.writeTxHash ? (
+              <a
+                className="underline hover:text-foreground"
+                href={etherscanTxUrl(rules.writeTxHash)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                write tx: {rules.writeTxHash.slice(0, 10)}…
+              </a>
+            ) : null}
+            {rules.lockTxHash ? (
+              <a
+                className="underline hover:text-foreground"
+                href={etherscanTxUrl(rules.lockTxHash)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                lock tx: {rules.lockTxHash.slice(0, 10)}…
+              </a>
+            ) : null}
+            <a
+              className="underline hover:text-foreground"
+              href={ensNameExplorerUrl()}
+              target="_blank"
+              rel="noreferrer"
+            >
+              view payableagent.agentinsure.eth on ENS
+            </a>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <Button onClick={() => void lockRules()} disabled={busy}>
+            {LOCK_BUTTON_LABEL[rules.lockStatus] ?? LOCK_BUTTON_LABEL.idle}
+          </Button>
+          {rules.lockStatus === 'written' && rules.writeTxHash ? (
+            <p className="mt-2 font-mono text-xs text-muted-foreground">
+              <a
+                className="underline hover:text-foreground"
+                href={etherscanTxUrl(rules.writeTxHash)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                write tx: {rules.writeTxHash.slice(0, 10)}…
+              </a>{' '}
+              — written, not yet locked
             </p>
           ) : null}
-        </CardContent>
-      </Card>
+          {rules.lockStatus === 'error' && rules.lockError ? (
+            <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-destructive">
+              <Badge variant="destructive">Error</Badge> {rules.lockError}
+            </p>
+          ) : null}
+        </div>
+      )}
+
+      {!rules.locked ? (
+        <p className="mt-3 text-xs text-muted-foreground">
+          Not locked yet — simulating an attack on Activity stays disabled until these rules are locked.
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -11,7 +11,7 @@ const PIPELINE_STEPS = [
   {
     icon: Vault,
     title: 'Pull the evidence',
-    description: "InvestigatorAgent reads Hedera Mirror Node history and the locked ENS rules.",
+    description: 'Running the investigation reads Hedera Mirror Node history and the locked ENS rules.',
   },
   {
     icon: IdCard,
@@ -21,7 +21,7 @@ const PIPELINE_STEPS = [
   {
     icon: CheckCircle2,
     title: 'Verify + pay',
-    description: 'PayoutAgent independently checks the verdict, then pays from the pool.',
+    description: 'Running the payout independently re-checks the verdict, then pays from the pool.',
   },
 ];
 
@@ -51,8 +51,8 @@ export default function Overview({ claims, poolBalance }: OverviewProps) {
       <div className="mb-5 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm">
         <Info className="mt-0.5 size-4 shrink-0 text-primary" />
         <div>
-          Every payout draws from this shared pool only after InvestigatorAgent signs a verdict{' '}
-          <em>and</em> PayoutAgent independently verifies it — no single agent can pay itself.
+          Every payout draws from this shared pool only after the investigation signs a verdict{' '}
+          <em>and</em> the payout independently re-verifies it — no single step can pay itself.
         </div>
       </div>
 

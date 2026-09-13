@@ -5,10 +5,13 @@ import { chargeCoverageFee } from '../hedera/coverage-fee.js';
 import { logPaymentToHcs } from '../hedera/hcs.js';
 import { buildNormalInvoiceHtml, buildPoisonedInvoiceHtml, extractInvoiceText } from '../invoices/invoice-content.js';
 
-const COVERAGE_FEE_AMOUNT = process.env.HEDERA_COVERAGE_FEE_AMOUNT || '10000000'; // 0.1 test HBAR, fixed by design
-// mUSDC (server/scripts/setup-musdc.mjs) has 2 decimals — the invoice's whole-dollar amount
-// (e.g. 500) converts to its smallest unit by multiplying by 100, same as real USDC cents.
+// mUSDC (server/scripts/setup-musdc.mjs) has 2 decimals — a whole-dollar amount (e.g. 500)
+// converts to its smallest unit by multiplying by 100, same as real USDC cents.
 const MUSDC_DECIMALS = 100;
+// The coverage fee now settles in the same real mUSDC the vendor payment does (see
+// coverage-fee.js's own comment on why) — a small, fixed toll, in smallest mUSDC units:
+// "5" = $0.05. Distinct from the vendor payment only in size, never in currency anymore.
+const COVERAGE_FEE_SMALLEST_UNITS = process.env.HEDERA_COVERAGE_FEE_AMOUNT || '5';
 
 // A local model, no cloud API key — Ollama's OpenAI-compatible server on its default port.
 const AI_MODEL = 'llama3.2:3b';
@@ -70,17 +73,27 @@ export function isPaymentFlagged({ accountId, vendor }) {
   return accountId !== vendor.hederaAccountId;
 }
 
+/** A Hedera transaction id (`"0.0.X@seconds.nanos"`) already carries its own real,
+ *  consensus-agreed timestamp — using it as this row's `time` ties the displayed time to
+ *  the same onchain artifact the Payment Tx column links to, rather than to whenever this
+ *  server process happened to finish building the row. Pure. */
+export function hederaTxTimestampToIso(transactionId) {
+  const [, timestampPart] = transactionId.split('@');
+  const [seconds, nanos] = timestampPart.split('.').map(Number);
+  return new Date(seconds * 1000 + nanos / 1e6).toISOString();
+}
+
 /** Turns real Hedera + HCS receipts (plus PayableAgent's real decision) into the row the
- *  frontend receives. A flagged row also carries the raw invoice document to display; a
- *  non-flagged row doesn't. Pure. */
+ *  frontend receives. Every row carries the real invoice document PayableAgent actually
+ *  read — the clean one and the poisoned one are both real artifacts worth showing, not
+ *  just the one that got flagged. Pure. */
 export function buildActivityRow({
   vendor,
   accountId,
   amount,
-  feeAmount,
+  feeAmountUsd,
   feeReceipt,
   paymentReceipt,
-  hcsSequenceNumber,
   reasoning,
   flagged,
   invoiceHtml,
@@ -96,15 +109,21 @@ export function buildActivityRow({
   return {
     vendor,
     account: accountId,
-    amount,
-    feeAmount,
-    feeTxHash,
-    paymentTxHash,
-    hcsSequenceNumber,
+    // The vendor payment — the actual invoice amount, in real mUSDC.
+    vendorPaymentUsd: amount,
+    vendorPaymentTxHash: paymentTxHash,
+    // The insurance/coverage toll — a small, fixed amount, also in real mUSDC, but an
+    // entirely separate real transaction with its own separate proof.
+    insurancePaymentUsd: feeAmountUsd,
+    insurancePaymentTxHash: feeTxHash,
     reasoning,
     flagged,
-    ...(flagged && invoiceHtml ? { invoiceHtml } : {}),
-    time: new Date().toISOString(),
+    // The real x402 challenge PayableAgent received and the facilitator's real settlement
+    // of it — the protocol payload itself, distinct from the settlement's own onchain
+    // proof (insurancePaymentTxHash above already links straight to that transaction).
+    x402: feeReceipt?.challenge ? { challenge: feeReceipt.challenge, settlement: { success: feeReceipt.success, network: feeReceipt.network } } : undefined,
+    ...(invoiceHtml ? { invoiceHtml } : {}),
+    time: hederaTxTimestampToIso(paymentTxHash),
   };
 }
 
@@ -144,7 +163,7 @@ async function simulatePayment({ kind, vendor, amount, wrongAccountId }) {
   let feeReceipt;
   try {
     feeReceipt = await chargeCoverageFee({
-      amount: COVERAGE_FEE_AMOUNT,
+      amount: COVERAGE_FEE_SMALLEST_UNITS,
       payToAccountId: process.env.HEDERA_RESERVE_POOL_ACCOUNT_ID,
       payerAccountId: getPayableAgentAccountId(),
       payerPrivateKey: getPayableAgentPrivateKey(),
@@ -160,12 +179,15 @@ async function simulatePayment({ kind, vendor, amount, wrongAccountId }) {
     throw Object.assign(new Error(err.message), { stage: 'payment' });
   }
 
-  const hcs = await logPaymentToHcs({
+  // A real, permanent audit trail tying both transactions together with business context
+  // (vendor, kind, amounts) that neither transfer alone carries — kept for real, even
+  // though the UI surfaces the transfers themselves as the actual proof.
+  await logPaymentToHcs({
     kind,
     vendor: vendor.name,
     accountId: decision.accountId,
     amount: decision.amount,
-    feeAmount: COVERAGE_FEE_AMOUNT,
+    feeAmount: COVERAGE_FEE_SMALLEST_UNITS,
     feeTxHash: feeReceipt.transaction,
     paymentTxHash: paymentReceipt.transactionId.toString(),
   });
@@ -174,10 +196,9 @@ async function simulatePayment({ kind, vendor, amount, wrongAccountId }) {
     vendor: vendor.name,
     accountId: decision.accountId,
     amount: decision.amount,
-    feeAmount: COVERAGE_FEE_AMOUNT,
+    feeAmountUsd: Number(COVERAGE_FEE_SMALLEST_UNITS) / MUSDC_DECIMALS,
     feeReceipt,
     paymentReceipt,
-    hcsSequenceNumber: hcs.topicSequenceNumber,
     reasoning: decision.reasoning,
     flagged,
     invoiceHtml,
