@@ -1,4 +1,6 @@
-# Agent Insure: Insurance for AI Agents Against LLM Prompt-Injection Fraud, Built on Hedera, ENS and World
+# Agent Insure
+
+Insurance for AI agents against LLM prompt-injection fraud, built on Hedera, ENS and World.
 
 ## Live Demo
 
