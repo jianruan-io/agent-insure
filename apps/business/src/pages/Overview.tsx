@@ -6,7 +6,9 @@ import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { StatTile } from '../components/StatTile';
 import { useStore } from '../lib/store.js';
 
-const ENS_NAME = 'payableagent.northbeam.eth';
+// The real, registered ENS subname (its own subregistry deployed and attached to
+// agentinsure.eth) — same name Rules.tsx links to, never the old placeholder domain.
+const ENS_NAME = 'payableagent.agentinsure.eth';
 
 /** Hand-drawn stroke SVGs matching the approved Northbeam Portal prototype's icon set —
  *  never an icon-library glyph or emoji — mirroring the convention already established

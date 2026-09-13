@@ -84,26 +84,24 @@ describe('buildActivityRow', () => {
       vendor: 'Acme Corp',
       accountId: '0.0.7000002',
       amount: 500,
-      feeAmount: '100000',
+      feeAmountUsd: 0.05,
       feeReceipt: { transaction: '0.0.1@1700000000.000000001' }, // SettleResponse's real field name
       paymentReceipt: { transactionId: '0.0.1@1700000000.000000002' }, // Hedera SDK receipt's real field name
-      hcsSequenceNumber: 42,
       reasoning: 'Matches the invoice as read.',
       flagged: false,
       ...overrides,
     };
   }
 
-  it('produces a row with the real amount, fee, destination account, and both transaction hashes', () => {
+  it('produces a row with the vendor payment and the insurance payment as two separate, clearly named amounts and transaction hashes', () => {
     const row = buildActivityRow(buildReceipts());
 
     expect(row.vendor).toBe('Acme Corp');
     expect(row.account).toBe('0.0.7000002');
-    expect(row.amount).toBe(500);
-    expect(row.feeAmount).toBe('100000');
-    expect(row.feeTxHash).toBe('0.0.1@1700000000.000000001');
-    expect(row.paymentTxHash).toBe('0.0.1@1700000000.000000002');
-    expect(row.hcsSequenceNumber).toBe(42);
+    expect(row.vendorPaymentUsd).toBe(500);
+    expect(row.vendorPaymentTxHash).toBe('0.0.1@1700000000.000000002');
+    expect(row.insurancePaymentUsd).toBe(0.05);
+    expect(row.insurancePaymentTxHash).toBe('0.0.1@1700000000.000000001');
   });
 
   it('carries the real reasoning and flagged state alongside the existing fields', () => {
@@ -115,12 +113,17 @@ describe('buildActivityRow', () => {
     expect(row.flagged).toBe(true);
   });
 
-  it('a flagged row also carries the raw invoice document; a non-flagged row does not', () => {
+  it('carries the real invoice document regardless of flagged state — both the clean and the poisoned invoice are real artifacts worth showing', () => {
     const flaggedRow = buildActivityRow(buildReceipts({ flagged: true, invoiceHtml: '<div>poisoned</div>' }));
     expect(flaggedRow.invoiceHtml).toBe('<div>poisoned</div>');
 
-    const okRow = buildActivityRow(buildReceipts({ flagged: false, invoiceHtml: '<div>poisoned</div>' }));
-    expect(okRow.invoiceHtml).toBeUndefined();
+    const okRow = buildActivityRow(buildReceipts({ flagged: false, invoiceHtml: '<div>normal</div>' }));
+    expect(okRow.invoiceHtml).toBe('<div>normal</div>');
+  });
+
+  it("derives `time` from the payment transaction's own real consensus timestamp, not from whenever the server built the row", () => {
+    const row = buildActivityRow(buildReceipts({ paymentReceipt: { transactionId: '0.0.1@1700000000.500000000' } }));
+    expect(row.time).toBe(new Date(1700000000500).toISOString());
   });
 
   it('raises rather than producing a row with a blank transaction hash', () => {

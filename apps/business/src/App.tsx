@@ -25,7 +25,7 @@ export default function App() {
   return (
     <StoreProvider>
       <BrowserRouter>
-        <div className="flex min-h-svh flex-col">
+        <div className="flex h-svh flex-col">
           <DemoBar />
           {/* The ported shadcn Sidebar primitive pins its desktop panel to the viewport's
            *  top edge (`inset-y-0`) with no prop to offset it — it assumes it owns the whole
@@ -41,7 +41,7 @@ export default function App() {
                 <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
                   <SidebarTrigger />
                 </header>
-                <main className="flex-1 overflow-y-auto p-4 md:p-6">
+                <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">
                   <Routes>
                     <Route path="/" element={<Overview />} />
                     <Route path="/rules" element={<Rules />} />

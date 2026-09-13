@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AppSidebar } from './components/AppSidebar';
+import { DemoBar } from './components/DemoBar';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from './components/ui/sidebar';
 import { INITIAL_POOL_BALANCE } from './lib/claims/data';
 import type { Claim } from './lib/claims/types';
@@ -48,11 +49,23 @@ export default function App() {
     setPoolBalance((prev) => prev - target.amount);
   }
 
+  async function handleReset() {
+    try {
+      await fetch(`${API_URL}/api/claims`, { method: 'DELETE' });
+    } catch {
+      // Best-effort — the local reset below still clears this app's own view even if
+      // the shared backend record couldn't be cleared (e.g. server not running yet).
+    }
+    setClaims([]);
+    setPoolBalance(INITIAL_POOL_BALANCE);
+  }
+
   return (
     <BrowserRouter>
       <SidebarProvider>
         <AppSidebar claims={claims} poolBalance={poolBalance} />
         <SidebarInset>
+          <DemoBar onReset={handleReset} />
           <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
             <SidebarTrigger />
           </header>

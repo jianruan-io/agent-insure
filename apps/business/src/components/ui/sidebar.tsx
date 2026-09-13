@@ -196,7 +196,14 @@ function Sidebar({
           'fixed z-10 hidden w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex',
           variant === 'fixed-header' || variant === 'inset'
             ? 'top-14 bottom-0 h-[calc(100vh-3.5rem)]'
-            : 'inset-y-0 h-svh',
+            : // `inset-y-0` alone (no explicit height) sizes this fixed panel to exactly
+              // its containing block's own height — correct whether that's the true
+              // viewport or (as in App.tsx) a `transform`-shifted container that starts
+              // below the demo-guide bar. An explicit `h-svh` here would override the
+              // `bottom-0` constraint with the full viewport height regardless of how
+              // much of it that containing block actually occupies, overflowing past
+              // its bottom edge by exactly the demo bar's height.
+              'inset-y-0',
           side === 'left'
             ? 'left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]'
             : 'right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]',
@@ -261,7 +268,7 @@ function SidebarInset({ className, ...props }: React.ComponentProps<'main'>) {
     <main
       data-slot="sidebar-inset"
       className={cn(
-        'relative flex flex-1 flex-col bg-background',
+        'relative flex min-w-0 flex-1 flex-col bg-background',
         !className?.includes('min-h-') && 'min-h-svh',
         'md:peer-data-[variant=inset]:mt-0 md:peer-data-[variant=inset]:mb-2 md:peer-data-[variant=inset]:mr-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2',
         className

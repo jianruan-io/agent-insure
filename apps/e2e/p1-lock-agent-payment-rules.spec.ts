@@ -99,17 +99,17 @@ test.describe('AP controller locks PayableAgent’s spending rules on real ENS t
         await expect(page.getByText('Locked on ENS')).toBeVisible();
       });
       await test.step("independent proof on ENS's own public explorer — not our app's word for it", async () => {
-        const namePage = await page.context().newPage();
-        await namePage.goto('https://hackathon-deployment-portal-app.ens-cf.workers.dev/agentinsure.eth');
-        await expect(namePage.getByText('agentinsure.eth')).toBeVisible({ timeout: 15_000 });
-        await expect(namePage.getByText('Owner')).toBeVisible();
-        await namePage.close();
-
-        const ensPage = await page.context().newPage();
-        await ensPage.goto('https://hackathon-deployment-portal-app.ens-cf.workers.dev/resolver/0x8B6195c5A125201FA3C63fb6637A8a70105d6e5c');
-        await expect(ensPage.getByText('ENS Permissioned Resolver')).toBeVisible({ timeout: 15_000 });
-        await expect(ensPage.getByText(/0x8B61.*6e5c/).first()).toBeVisible();
-        await ensPage.close();
+        // payableagent.agentinsure.eth is a real, registered ENS subname (its own
+        // subregistry was deployed and attached to agentinsure.eth for this) — its Records
+        // tab shows the actual written budgetCap/vendors values directly, not just generic
+        // name/resolver furniture.
+        const recordsPage = await page.context().newPage();
+        await recordsPage.goto('https://hackathon-deployment-portal-app.ens-cf.workers.dev/payableagent.agentinsure.eth/records');
+        await expect(recordsPage.getByText('agentinsure.budgetCap')).toBeVisible({ timeout: 15_000 });
+        await expect(recordsPage.getByText('5000', { exact: true })).toBeVisible();
+        await expect(recordsPage.getByText('agentinsure.vendors')).toBeVisible();
+        await expect(recordsPage.getByText(/"name":"Acme Corp"/)).toBeVisible();
+        await recordsPage.close();
       });
       return;
     }

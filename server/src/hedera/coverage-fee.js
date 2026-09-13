@@ -10,12 +10,21 @@ import { createClientHederaSigner } from '@x402/hedera';
  * shipped type declarations, not guessed — see this issue's spec for how.
  */
 
-// HBAR, not @x402/hedera's HEDERA_TESTNET_USDC — that HTS token's real testnet treasury
+// Our own mUSDC — not @x402/hedera's HEDERA_TESTNET_USDC, whose real testnet treasury
 // (0.0.5176) has no public faucet, so PayableAgent's operator account can never hold any
-// of it. HBAR is a first-class asset in @x402/hedera's own exact scheme (HBAR_ASSET_ID =
-// "0.0.0", branched explicitly in its preflight/signer code) and the operator already
-// holds real testnet HBAR, confirmed by actually running the fee charge end to end.
-const DEFAULT_ASSET = '0.0.0';
+// of it. @x402/hedera's exact-scheme signer builds a generic HTS `addTokenTransfer` for
+// any non-HBAR asset (confirmed by reading its own shipped source, not guessed), and a
+// real end-to-end charge against the live facilitator settles a real mUSDC transfer just
+// fine — so the coverage fee and the vendor payment it gates both move in the same real,
+// dollar-pegged asset, rather than splitting the demo across HBAR and mUSDC for no reason
+// a viewer would understand.
+//
+// Read lazily (a function, not a module-level constant) — index.js imports this module
+// before it calls dotenv.config(), so a constant captured at import time would always see
+// an empty process.env and silently break every real call with "asset is required".
+function getDefaultAsset() {
+  return process.env.HEDERA_MUSDC_TOKEN_ID;
+}
 const DEFAULT_FACILITATOR_URL = 'https://api.testnet.blocky402.com';
 // Confirmed against the live facilitator's own /supported response — it registers only
 // x402Version 2 and rejects version 1 outright ("No facilitator registered for x402 version: 1").
@@ -23,7 +32,7 @@ const X402_VERSION = 2;
 const RESOURCE_URL = '/api/coverage/charge';
 
 /** Builds one real PaymentRequirements row. Pure. */
-export function buildCoverageFeeRequirements({ amount, payToAccountId, asset = DEFAULT_ASSET, feePayer }) {
+export function buildCoverageFeeRequirements({ amount, payToAccountId, asset = getDefaultAsset(), feePayer }) {
   if (!amount || Number(amount) <= 0) {
     throw new Error('Coverage fee amount must be a positive value — refusing to charge nothing.');
   }
@@ -138,9 +147,13 @@ export async function chargeCoverageFee({ amount, payToAccountId, asset, payerAc
   const facilitator = getFacilitator();
   const feePayer = await getHederaFeePayer(facilitator);
   const requirements = buildCoverageFeeRequirements({ amount, payToAccountId, asset, feePayer });
+  const challenge = buildPaymentRequiredBody(requirements);
   const signer = createClientHederaSigner(payerAccountId, payerPrivateKey);
   const scheme = new ExactHederaScheme(signer);
   const payloadResult = await scheme.createPaymentPayload(X402_VERSION, requirements);
   const paymentHeaderBase64 = Buffer.from(JSON.stringify(payloadResult)).toString('base64');
-  return settleCoverageFee(paymentHeaderBase64, requirements);
+  const settlement = await settleCoverageFee(paymentHeaderBase64, requirements);
+  // Carries the real 402 challenge alongside its settlement so the UI can show the whole
+  // protocol exchange (the "Payment Required" moment), not just its financial side effect.
+  return { ...settlement, challenge };
 }

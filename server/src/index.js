@@ -14,23 +14,15 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
 
 const app = express();
 app.use(express.json());
-// Northbeam and Agent Insure HQ run on localhost during local dev (plus a phone on the
-// same LAN for a live demo — private network ranges only), and on their own deployed
-// origins in production — set ALLOWED_ORIGINS (comma-separated, e.g.
-// "https://northbeam.up.railway.app,https://agent-insure-hq.up.railway.app") once those
-// are known; deploying with it unset just falls back to the local-only allowlist.
-const deployedOrigins = (process.env.ALLOWED_ORIGINS || '')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+// Both Northbeam and Agent Insure HQ run on localhost during the hackathon (plus a phone on
+// the same LAN for a live demo — private network ranges only, never the open internet).
 app.use(
   cors({
     origin: (origin, callback) => {
       if (
         !origin ||
         /^https?:\/\/localhost(:\d+)?$/.test(origin) ||
-        /^https?:\/\/(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/.test(origin) ||
-        deployedOrigins.includes(origin)
+        /^https?:\/\/(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/.test(origin)
       ) {
         callback(null, true);
         return;
@@ -48,7 +40,9 @@ registerWorldRoutes(app);
 registerClaimRoutes(app);
 registerCoverageFeeRoute(app, {
   getRequirementParams: () => ({
-    amount: process.env.HEDERA_COVERAGE_FEE_AMOUNT || '10000000',
+    // mUSDC smallest units now (2 decimals) — see routes/activity.js's own
+    // COVERAGE_FEE_SMALLEST_UNITS comment for why the coverage fee moved off HBAR.
+    amount: process.env.HEDERA_COVERAGE_FEE_AMOUNT || '5',
     payToAccountId: process.env.HEDERA_RESERVE_POOL_ACCOUNT_ID,
   }),
 });
