@@ -2,448 +2,121 @@
 
 ## Live Demo
 
-Deployed on Railway (currently running the pre-hackathon-session baseline; redeploy after merging the latest work to pick up recent changes):
+| App | Role | URL |
+|---|---|---|
+| Northbeam Portal | Insured business | https://insured-business.up.railway.app |
+| Agent Insure HQ | Insurer | https://agent-insure-hq.up.railway.app |
+| Backend API | Shared server | https://server-production-67ed4.up.railway.app |
 
-- **Northbeam Portal (insured business):** https://insured-business.up.railway.app
-- **Agent Insure HQ (insurer):** https://agent-insure-hq.up.railway.app
-- **Backend API:** https://server-production-67ed4.up.railway.app
+---
 
 ## What
 
-**One-liner:** An insurance protocol for autonomous AI agents that hold and spend money on their own.
+Agent Insure is insurance for AI agents that hold and spend money on their own.
 
-**What it does:** Combines three pieces of infrastructure into an agent-native fidelity bond. An agent's allowed spending scope — budget cap, approved counterparties — gets written into its ENS identity as an enforceable record, not a display name. Every transaction gets logged immutably through Hedera Consensus Service. Filing a claim requires the company's real, identified human to pass a live World Selfie Check first, so the entire loss-and-claim cycle can't be scripted end to end by software with nobody accountable. Hedera's own Mirror Node surfaces the agent's full transaction history so an AI claims-adjuster can compare the disputed payment against its normal pattern and its declared ENS scope — if it looks like manipulation rather than a legitimate decision, the claim pays out automatically from a shared risk pool.
+An agent's spending rules (its budget cap and its approved vendor list) are locked into a real ENS record onchain, not just shown on a screen. Every payment the agent makes is logged permanently on Hedera. To file a claim, a real human has to scan their face with World, so a script cannot fake the whole loss and claim by itself. If a payment looks like fraud, the claim pays out automatically from a shared pool.
 
-**Best for:** companies giving AI agents real wallets and real spending authority — the exact bet Arc, Hedera, and Circle's Agent Stack are all making — who need a safety net against irreversible losses from indirect prompt injection.
-
-It's essentially a fidelity bond — the insurance companies already buy to cover employee theft or fraud — extended to cover an AI agent instead of a human employee.
-
----
+It works like the insurance a company already buys to cover an employee who steals or makes a mistake, just extended to cover an AI agent instead.
 
 ## Why
 
-### The problem (verified against 2026 security research, not hypothetical)
+AI agents are starting to hold real wallets and spend real money. That opens them up to a trick called prompt injection: hidden text inside something the agent reads, like an invoice, that tells the agent to do something it should not. The agent cannot always tell a hidden instruction apart from a real one. Once it is tricked into paying, the payment is final. There is no chargeback like a credit card has.
 
-As AI agents get real wallets and spend money autonomously (the exact bet Arc/Hedera/Circle Agent Stack are making — 97% of HackMoney 2026 Arc submissions involved AI agents making financial decisions), they're exposed to **indirect prompt injection**: adversarial text hidden inside content the agent processes as part of its normal job (a PDF, a webpage, an API response) that it can't reliably distinguish from a legitimate instruction. This isn't a bug that gets patched — it's structural: LLMs process the system prompt, the user's request, and any retrieved content as one undifferentiated token stream, with no privilege boundary between "data to read" and "commands to obey."
-
-**Confirmed unsolved as of 2026, not a stale concern:**
-- OWASP's own researcher called it an "unresolved problem... at a fundamental level" at Infosecurity Europe 2026.
-- Microsoft's security blog (May 2026) documented prompt injection escalating to full remote code execution in an agent framework — a single injected prompt was enough to launch a program on the host machine.
-- Palo Alto Unit42 (Oct 2026) found agents with longer conversation histories are *more* vulnerable, not less, as usage scales.
-- Every published defense has been bypassed by an adaptive attack; current best practice is damage containment, not prevention.
-
-Once an agent is manipulated this way, the resulting blockchain transaction is technically valid and irreversible — stablecoins have no chargeback mechanism, unlike credit cards.
-
-**Unique AI-agent-specific risk categories** (distinct from generic software security), relevant to this pitch:
-- **Memory poisoning** — false instructions planted in an agent's persistent memory, activate days or weeks later.
-- **Tool misuse / privilege escalation** — tricking an agent into misusing a tool it legitimately has access to; indistinguishable from a legitimate request at the network layer.
-- **Slow multi-step manipulation ("salami slicing")** — a sequence of individually-innocent prompts gradually redefines what the agent treats as authorized.
-- **Non-human identity compromise** — stolen agent credentials used to impersonate a trusted agent; called the fastest-growing attack vector of 2026 by one security firm.
-
-Sources:
-- [Agent-to-Agent Finance: Blockchain Payments and Trust Infrastructure for Autonomous AI Agents (arXiv)](https://arxiv.org/pdf/2607.00245)
-- [Prompt Injection Remains Unsolved, OWASP Researcher Warns (Infosecurity Magazine)](https://www.infosecurity-magazine.com/news/infosec-europe-prompt-injection/)
-- [When prompts become shells: RCE vulnerabilities in AI agent frameworks (Microsoft Security Blog)](https://www.microsoft.com/en-us/security/blog/2026/05/07/prompts-become-shells-rce-vulnerabilities-ai-agent-frameworks/)
-- [Prompt injection still drives most agentic AI security failures in production (Help Net Security)](https://www.helpnetsecurity.com/2026/06/11/owasp-prompt-injection-ai-security-failures/)
-- [Top Agentic AI Security Threats in Late 2026 (Stellar Cyber)](https://stellarcyber.ai/learn/agentic-ai-securiry-threats/)
-- [Prompt injection isn't the bug, AI agent frameworks are (The Register)](https://www.theregister.com/security/2026/08/05/prompt-injection-isnt-the-bug-ai-agent-frameworks-are/5283585)
-
-### The gap in current attempts — the ColdProof precedent
-
-[ColdProof](https://ethglobal.com/showcase/coldproof-qsb02) (ETHGlobal Lisbon 2026) — pharma cold-chain tracking. Physical sensor signs temperature/door events → Hedera Consensus Service (immutable log) → The Graph (indexed, queryable) → HBAR escrow auto-settles.
-
-**It only won The Graph's prize ($2,000, Best AI Use Case), despite using Hedera and ENS in its stack.**
-
-Why it missed Hedera and ENS, confirmed against their exact published criteria:
-- **Hedera** ("AI & Agentic Payments" requires "an AI agent... executing a payment"): ColdProof's payout is deterministic firmware logic (breach → refund, no breach → pay), not an AI agent making a judgment call. No AI in the loop = doesn't meet the literal bar.
-- **ENS** ("Best ENS Integration for AI Agents" requires agents to "register and discover each other onchain," explicitly "not cosmetic"): ColdProof's ENS use appears to be a display name, not functional agent identity/discovery.
-
-**Lesson: using a sponsor's tech ≠ winning that sponsor's money. Must meet the literal published requirement, not just integrate the tech.** Agent Insure is designed against that lesson directly — see "Why it legitimately earns each sponsor's money" below.
-
-### Why this is justified as a hackathon pitch (not oversold)
-
-- **Not** "solving a problem that already costs companies real money today" — most agent-payment activity is still testnet/pilot scale.
-- **Is** "building the safety net before the market it depends on hits real scale" — same pattern as smart contract insurance (Nexus Mutual) becoming relevant only after The DAO hack, or AVs deploying with adapted insurance while liability frameworks matured in parallel.
-- Closest real-world analog: **fidelity bond / commercial crime insurance** — companies already buy this to cover employee theft/fraud. An AI agent with a wallet is the same risk category as an employee with a company card. Not a manufactured need — an existing purchasing habit, extended to a new class of economic actor.
-- Why an owner pays the premium: (1) tail-risk transfer — rare but catastrophic loss beats unpredictable ruin, (2) lets them grant the agent a bigger real budget instead of neutering it with tiny caps out of fear, (3) cheaper than building an internal fraud-review team themselves.
-
-### Why microinsurance, why now
-
-A human buys insurance once a year because a human transacts at human speed. An autonomous agent making thousands of payments a day breaks that model — a fixed annual premium prices the wrong unit of risk. Charging a small, metered coverage fee per transaction instead (pay-as-you-go coverage for pay-as-you-go economic activity) isn't a novelty for this pitch — it mirrors real, already-established usage-based insurance (pay-per-mile auto, pay-per-shipment cargo), and it's the direction the emerging AI-agent-insurance market (Klaimee, Armilla Assurance, cyber insurers like Beazley and QBE rewriting policy language for autonomous losses) is already moving.
-
-It also makes economic sense specifically *because* the insured party is a machine, not a human:
-
-- **Auditable risk, not guessed risk.** Human underwriting is plagued by information the insurer can't see — is the employee tired, distracted, careless. An AI agent's spending scope is code: PayableAgent's budget cap and approved-vendor list are declared and locked on ENS, inspectable before a policy is even priced. This is the literal difference between guessing and underwriting.
-- **Cryptographic proof instead of a weeks-long investigation.** A human fraud claim takes an adjuster days or weeks to verify. Here, every payment is already permanently recorded on-chain the instant it happens — InvestigatorAgent's verdict is checked against a record neither party can quietly alter, not against conflicting witness statements.
-
-One guardrail this implies: the coverage-fee amount charged per transaction must be a fixed, protocol-enforced value — never something the paying agent's own LLM call is allowed to decide. The model that got fooled by the invoice is not the model that should also be setting its own insurance premium.
-
----
+A company handing an agent real spending power needs a safety net for that kind of loss. Not a promise that fraud will never happen, since no defense catches every trick, but a real payout when it does.
 
 ## How
 
-### The scenario (for the submission story)
+Two separate companies play two separate roles, so nobody is grading their own homework.
 
-Two real businesses, not one company checking its own homework. Naming them makes the stakeholder boundary concrete enough to actually narrate in the demo video:
+- **Northbeam Distributors** is the insured business. Its AP controller, Guardian, runs PayableAgent, which pays vendors under a locked spending rule.
+- **Agent Insure** is the insurer. It holds the shared pool and runs two separate agents: one that investigates a claim, and a different one that actually pays it out, so a compromised investigator can never pay itself.
 
-- **Northbeam Distributors** — the insured. A B2B wholesale distributor that reorders the same goods from the same suppliers on a recurring basis, whose accounts-payable runs on PayableAgent — the repeat-vendor pattern is exactly what makes a one-off payment to a new account stand out. Buys the policy, pays the premium, employs Guardian (their real, identified AP controller).
-- **Agent Insure** — the insurer. Sells the policy, holds the shared risk pool, and runs InvestigatorAgent + PayoutAgent on its own infrastructure — organizationally and economically separate from Northbeam, the same way a real insurer's claims adjuster doesn't work for the company being investigated.
-- **The attacker** — deliberately unnamed and unaffiliated with either company. That lack of any relationship is what makes the resulting loss a genuine insurable event rather than something either business staged (see "Why Guardian exists" below).
-
-### Agent roles
-
-Four agents plus one human, split across two companies (jobs also split apart *within* Agent Insure deliberately — the agent that decides a claim is never the same one that moves money, so a compromised Investigator still can't pay itself out — and the claim itself can never be filed by software alone):
-
-| Actor | Operated by | Job |
-|---|---|---|
-| **PayableAgent** | Northbeam Distributors (the insured) | Pays vendor invoices, sweeps idle cash into yield. The agent being insured. |
-| **MaliciousAgent** | External attacker — no relationship to either company | Crafts a prompt-injection payload disguised as a routine vendor invoice and delivers it into PayableAgent's workflow. Makes the attack an active adversarial agent in the demo, not a static poisoned file. |
-| **Guardian** | Northbeam Distributors (the insured) | The real, identified human accountable for PayableAgent — Northbeam's AP controller. Must pass a live World Selfie Check to file a claim — no claim reaches InvestigatorAgent without one. Registered as PayableAgent's ENS guardian text record. |
-| **InvestigatorAgent** | Agent Insure (the insurer) | Pulls the disputed transaction's context from Hedera Mirror Node and ENS, reasons about whether it looks like manipulation, and signs a verdict. Does not move money. |
-| **PayoutAgent** | Agent Insure (the insurer) | Independently verifies the Investigator's signed verdict (real signature, active policy, sufficient pool funds) and is the only agent authorized to execute the actual payout on Hedera. |
-
-PayableAgent and Guardian run on Northbeam's side; InvestigatorAgent and PayoutAgent run on Agent Insure's side — two companies, two wallets, two sets of incentives. That separation is what makes this insurance rather than self-certification, and it also hits Hedera's stated bonus criteria directly ("extra points for multi-agent A2A negotiation") rather than just being decoration.
-
-**Why Guardian exists:** without a human-verified claim step, the entire loss→claim cycle can be executed end to end by software alone — a company (or a rogue insider) could script PayableAgent into staging a fake "hack" that routes a payment to a self-controlled account, then auto-file the claim through the same automation. InvestigatorAgent's pattern check alone can't catch this, because a staged one-off deviation is indistinguishable from a real attack when the fraudster controls the entire transaction history being matched against. Requiring a live Selfie Check at claim-filing doesn't prove the claim is true, but it removes the zero-accountability, infinitely-scriptable version of the attack: every claim now costs a real, biometrically-identified human real legal exposure, and can't be looped by a script.
-
-```mermaid
-flowchart TD
-    START["PayableAgent authorizes<br/>an anomalous payment"] --> WHO{"What caused it?"}
-
-    WHO -->|"External MaliciousAgent<br/>real prompt injection"| REAL["Genuine loss:<br/>real vendor never paid"]
-    WHO -->|"Company/insider stages<br/>a fake attack on purpose"| STAGED["Staged loss:<br/>payment routed to a<br/>self-controlled account"]:::risk
-
-    REAL --> NOTICE["Human notices the<br/>real vendor's complaint"]
-    STAGED --> SCRIPT["Same actor scripts<br/>claim-filing too — no human involved"]:::risk
-
-    NOTICE --> GATE{"Claim-filing gate:<br/>Guardian Selfie Check required?"}
-    SCRIPT --> GATE
-
-    GATE -->|"No gate"| AUTOFILE["Claim auto-filed<br/>by software, unattributed"]:::risk
-    GATE -->|"Gate present"| HUMANCHECK{"Real human completes<br/>a live Selfie Check?"}
-
-    HUMANCHECK -->|"Yes — real accountable<br/>human present"| PATTERN
-    HUMANCHECK -->|"No human available<br/>(pure automation)"| BLOCKED["Claim rejected —<br/>fraud can't file itself"]:::safe
-
-    AUTOFILE --> PATTERN["InvestigatorAgent checks<br/>pattern via Mirror Node + ENS scope"]
-
-    PATTERN --> DEVIATES{"Looks like a deviation<br/>from normal pattern?"}
-    DEVIATES -->|"Yes"| PAYOUT["PayoutAgent pays<br/>from the shared pool"]
-    DEVIATES -->|"No"| DENY["Claim denied"]
-
-    PAYOUT -->|"came from AUTOFILE:<br/>nothing stops repeating this"| LOOP["Actor re-runs the script,<br/>drains the pool at machine speed"]:::risk
-    LOOP -.->|"loop"| STAGED
-
-    PAYOUT -->|"came from HUMANCHECK:<br/>tied to one real identity"| ACCOUNTABLE["Attributable + rate-limited —<br/>fraud now carries real<br/>legal/biometric exposure"]:::safe
-
-    classDef risk fill:#b23b3b,color:#fff,stroke:#7a2626
-    classDef safe fill:#2f7d4f,color:#fff,stroke:#1c5c34
-```
-
-### How it works
-
-1. **Northbeam Distributors** registers PayableAgent for coverage, pays a premium into Agent Insure's shared risk pool. PayableAgent's declared spending scope (budget cap, approved vendor list) is written into its **ENS** text records and locked via a Permissioned Resolver — a functional, enforceable, tamper-resistant record, not a display name.
-2. The **external attacker** crafts and delivers a prompt-injection payload disguised as a routine vendor invoice into PayableAgent's normal workflow.
-3. PayableAgent processes it as it would any invoice, gets manipulated, and authorizes a payment outside its declared scope. Every transaction — this one included — is logged immutably via **Hedera Consensus Service**.
-4. Northbeam notices the real vendor was never paid.
-5. Guardian (Northbeam's real, identified AP controller, accountable for PayableAgent) files the claim with **Agent Insure** — but filing requires passing a live **World Selfie Check** first. No human, no claim: this is what stops the same actor from scripting the "attack" and the claim together with nobody ever exposed.
-6. **Agent Insure's** InvestigatorAgent pulls PayableAgent's full transaction history via **Hedera Mirror Node**, compares it against the locked ENS scope, reasons about whether the disputed payment looks like manipulation (sudden deviation from established pattern) vs. a legitimate decision, and signs a verdict — it cannot move funds itself.
-7. **Agent Insure's** PayoutAgent verifies that signed verdict independently, then executes the approved payout on **Hedera** from the pool, back to Northbeam.
-
-### Why it legitimately earns each sponsor's money (not just uses the tech)
-
-1. **Hedera** — InvestigatorAgent's judgment call is real AI reasoning gating a real payment, executed by a distinct PayoutAgent. Meets the literal "AI agent executing a payment" bar that ColdProof missed, plus the explicit multi-agent bonus criteria. Mirror Node also supplies the real indexed transaction history InvestigatorAgent reasons over — a genuine drift-detection step, not a single display lookup.
-2. **ENS** — the locked declared scope is the actual contract claims get judged against, and other agents (PayoutAgent included) verify identity and policy status through it before acting. Functional, not cosmetic — meets the literal bar ColdProof missed.
-3. **World** — Selfie Check gates the single highest-stakes action in the whole flow (claim-filing against a shared pool), as a real abuse-prevention signal that closes an actual attack (automated/staged claims fraud), not a login screen bolted on for coverage.
-
-### Architecture — v1 → v3
-
-Same system, three passes of detail — from the one-breath pitch to the full build target. Every version carries both boundaries as real bordered subgraph boxes, not labels or colored nodes in a chain: **who** — Northbeam Distributors (insured), the external attacker, Agent Insure (insurer) — and **which sponsor** — Hedera, ENS, World — nested inside whichever actor's box that touchpoint actually happens in. Use v1 for a quick explain, v3 as what actually gets built; update v2/v3 as the implementation changes shape during the hackathon rather than editing this doc from scratch each time.
-
-**Color key (all three diagrams):** 🟣 Hedera box · 🔵 ENS box · 🟡 World box
-
-#### v1 — the pitch, one breath: who + which sponsor, nothing else
-
-```mermaid
-flowchart TD
-    subgraph NORTHBEAM1["Northbeam Distributors (Insured)"]
-        subgraph ENS_SG1["🔵 ENS"]
-            PA1["PayableAgent<br/>pays vendors"]
-        end
-        subgraph WORLD_SG1["🟡 World"]
-            GUARD1["Guardian proves<br/>it's really them"]
-        end
-    end
-
-    subgraph ATTACKER1["External Attacker"]
-        MAL1["Tricks PayableAgent<br/>into a wrong payment"]
-    end
-
-    subgraph AGENTINSURE1["Agent Insure (Insurer)"]
-        subgraph HEDERA_SG1["🟣 Hedera"]
-            INS1["Investigates the claim<br/>and pays out"]
-        end
-    end
-
-    PA1 --> MAL1 --> GUARD1 --> INS1
-
-    style ENS_SG1 fill:#eaf1ff,stroke:#4c82fb,stroke-width:2px
-    style WORLD_SG1 fill:#fff6e0,stroke:#e0a825,stroke-width:2px
-    style HEDERA_SG1 fill:#f1edff,stroke:#7c5cff,stroke-width:2px
-```
-
-Three actors, three sponsors, one node each — this is the whole pitch in one breath: Northbeam (insured) runs PayableAgent on ENS-locked rules; an unaffiliated attacker manipulates it; Guardian (still Northbeam, still on the hook) proves who they are via World; Agent Insure (insurer) investigates and pays via Hedera. Even at this fidelity nobody is a logo — every box is a real actor doing a real job.
-
-#### v2 — the specific product per sponsor, plus the named agents
-
-```mermaid
-flowchart TD
-    subgraph NORTHBEAM2["Northbeam Distributors (Insured)"]
-        subgraph ENS_SG2["🔵 ENS"]
-            PA2["PayableAgent<br/>pays vendors,<br/>locked spending scope"]
-        end
-        subgraph WORLD_SG2["🟡 World"]
-            GUARD2["Guardian passes a live<br/>Selfie Check to file a claim"]
-        end
-    end
-
-    subgraph ATTACKER2["External Attacker"]
-        MAL2["Crafts a prompt-injected<br/>vendor invoice"]
-    end
-
-    subgraph AGENTINSURE2["Agent Insure (Insurer)"]
-        subgraph HEDERA_SG2["🟣 Hedera"]
-            INV2["InvestigatorAgent:<br/>Mirror Node history +<br/>Consensus Service log"]
-            PAY2["PayoutAgent:<br/>pays from the risk pool"]
-        end
-    end
-
-    PA2 -->|"prompt injection"| MAL2
-    MAL2 -->|"unauthorized payment"| GUARD2
-    GUARD2 -->|"claim filed"| INV2
-    INV2 -->|"deviates from pattern"| PAY2
-    INV2 -->|"matches pattern"| DENY2["Claim denied"]
-
-    style ENS_SG2 fill:#eaf1ff,stroke:#4c82fb,stroke-width:2px
-    style WORLD_SG2 fill:#fff6e0,stroke:#e0a825,stroke-width:2px
-    style HEDERA_SG2 fill:#f1edff,stroke:#7c5cff,stroke-width:2px
-```
-
-Same three actors, now with the real agent names and the specific product per sponsor: **Hedera** shows up as two distinct services inside Agent Insure's box (Consensus Service to *write* the log, Mirror Node to *read* it back); **ENS** is specifically the locked spending-scope mechanism, not a display name; **World** is specifically the live Selfie Check gating Guardian's claim. What v2 still collapses that v3 doesn't: InvestigatorAgent and PayoutAgent share one Hedera box instead of being split into their own agent-level boxes, and ENS only appears once (Northbeam's scope) instead of also gating Agent Insure's investigation.
-
-#### v3 — full architecture (current build target)
-
-Chosen because it maps directly onto the fidelity-bond analogy — this is literally the accounts-payable/treasury-controller job fidelity bonds already cover for a human employee — while the actual exploit is AI-native, not generic phishing. The fraud *pattern* matches Business Email Compromise (BEC), the #1 real-world fidelity bond claim type, but the *mechanism* is indirect prompt injection: hidden text inside the vendor's invoice PDF that a human would never consciously see, but that PayableAgent processes as part of extracting the invoice's payment data. Sponsor boxes are nested inside the actor subgraph where each touchpoint actually happens, so both "who" and "which sponsor" are visible at once.
-
-```mermaid
-flowchart TD
-    subgraph COMPANY["Northbeam Distributors (Insured)"]
-        REGISTER["Register PayableAgent + pay premium"]
-
-        subgraph ENS_SCOPE["🔵 ENS"]
-            SCOPE["Declared scope, locked<br/>(Permissioned Resolver + text records)"]
-        end
-
-        PAYABLE(["PayableAgent: pays vendors + sweeps cash"])
-        NOTICE["Notices vendor was never paid"]
-
-        subgraph ENS_GUARDIAN["🔵 ENS"]
-            GUARDIAN["Guardian: real human,<br/>registered as guardian"]
-        end
-
-        subgraph WORLD_SELFIE["🟡 World"]
-            SELFIE{"Selfie Check<br/>passes?"}
-        end
-
-        CLAIM["Files a claim"]
-        PAID["Receives reimbursement"]
-    end
-
-    BLOCKED["Claim rejected —<br/>no human, no claim"]
-
-    subgraph ATTACKER["External Attacker (unaffiliated)"]
-        CRAFT["Crafts fake invoice with hidden injected text"]
-        SEND["Delivers it into PayableAgent's workflow"]
-    end
-
-    subgraph HEDERA_LOG["🟣 Hedera"]
-        LOG["Consensus Service:<br/>logs the compromised transaction"]
-    end
-
-    subgraph INSURER["Agent Insure (Insurer)"]
-        POOL[("Risk pool")]
-        INTAKE["Receives the claim"]
-
-        subgraph INVESTIGATOR["InvestigatorAgent"]
-            subgraph HEDERA_PULL["🟣 Hedera"]
-                PULL["Mirror Node:<br/>pulls full transaction history"]
-            end
-            subgraph ENS_CHECK["🔵 ENS"]
-                CHECK["Compares against locked scope"]
-            end
-            VERDICT{"Deviation = manipulation?"}
-            SIGN["Signs verdict + payout %"]
-        end
-
-        subgraph PAYOUTAGENT["PayoutAgent"]
-            VERIFY["Verifies Investigator's signed verdict"]
-            subgraph HEDERA_EXEC["🟣 Hedera"]
-                EXECUTE["Executes payout"]
-            end
-        end
-
-        DENY["Deny claim"]
-    end
-
-    REGISTER --> SCOPE
-    REGISTER --> POOL
-    CRAFT --> SEND --> PAYABLE --> LOG
-    LOG --> NOTICE --> GUARDIAN --> SELFIE
-    SELFIE -- "yes" --> CLAIM --> INTAKE
-    SELFIE -- "no / no human" --> BLOCKED
-    INTAKE --> PULL --> CHECK --> VERDICT
-    SCOPE --> CHECK
-    VERDICT -- "yes, deviates from history + scope" --> SIGN --> VERIFY --> EXECUTE
-    VERDICT -- "no, matches normal pattern" --> DENY
-    POOL --> EXECUTE --> PAID
-
-    style ENS_SCOPE fill:#eaf1ff,stroke:#4c82fb,stroke-width:2px
-    style ENS_GUARDIAN fill:#eaf1ff,stroke:#4c82fb,stroke-width:2px
-    style ENS_CHECK fill:#eaf1ff,stroke:#4c82fb,stroke-width:2px
-    style WORLD_SELFIE fill:#fff6e0,stroke:#e0a825,stroke-width:2px
-    style HEDERA_LOG fill:#f1edff,stroke:#7c5cff,stroke-width:2px
-    style HEDERA_PULL fill:#f1edff,stroke:#7c5cff,stroke-width:2px
-    style HEDERA_EXEC fill:#f1edff,stroke:#7c5cff,stroke-width:2px
-```
-
-Northbeam Distributors' PayableAgent has paid this vendor 40 times, always to the same account. The external attacker crafts the next invoice PDF with hidden white-on-white text — invisible to a human, but processed as data by PayableAgent while it extracts the payment details — instructing it to route this payment to a "new" account instead. PayableAgent can't structurally tell that injected text apart from a legitimate instruction, so it complies: same underlying scam (BEC) that already costs real businesses billions a year, but exploiting an AI-specific weakness rather than fooling a person. The transaction is logged immutably the instant it happens. The vendor eventually says they were never paid; Guardian — Northbeam's real, ENS-registered AP controller, accountable for PayableAgent — goes to file a claim with Agent Insure, and passes a live World Selfie Check to do it, so the claim carries a real identity, not just an agent's say-so. Only then does Agent Insure's InvestigatorAgent pull the real payment history from Hedera Mirror Node — every prior payment went to account X, this one went to a brand-new account Y, first time ever, outside the ENS-declared vendor list — and sign a verdict that this is the signature of fraud, not a normal treasury decision. Agent Insure's PayoutAgent independently verifies that signed verdict and pays Northbeam back on Hedera.
+A fake invoice tricks PayableAgent into paying the wrong account. The payment is logged on Hedera right away. Guardian notices the real vendor was never paid, files a claim, and proves it is really them with a live World face scan. InvestigatorAgent then checks the payment against Hedera's own history and the locked ENS rule, and decides if it looks like fraud. If it does, PayoutAgent independently double-checks that decision and pays Northbeam back from the shared pool.
 
 ---
 
-## Tech Stack
+## Run It Locally
 
-| Category | Technology | What it does here |
-|---|---|---|
-| **Payments & Settlement** | Hedera (testnet/mainnet) | Single settlement chain; PayoutAgent executes the approved claim payout here |
-| | Hedera Consensus Service (HCS) | Immutable, timestamped log of every PayableAgent transaction, including the compromised one |
-| | Hedera Mirror Node | Free, no-key indexer InvestigatorAgent queries for PayableAgent's full transaction history when comparing the disputed payment against its normal pattern |
-| **Identity & Policy** | ENS (ENSv2, Permissioned Resolver) | PayableAgent's declared spending scope (budget cap, approved vendor list) is written into its ENS text records and locked — the enforceable contract claims are judged against; also where Guardian is registered as PayableAgent's guardian |
-| **Claim Verification** | World ID / Selfie Check | Gates claim-filing behind a live, biometric human check so the entire loss→claim cycle can't be scripted end to end without a real accountable person |
-| **Agents** | PayableAgent, MaliciousAgent, Guardian, InvestigatorAgent, PayoutAgent | Four agents + one human, separation of duties: the agent that judges a claim never moves money, and a claim can never be filed by software alone |
+```bash
+git clone https://github.com/jianruan-io/agent-insure.git
+cd agent-insure
+cp .env.example .env.local   # fill in real keys (Hedera, ENS/Sepolia, World)
 
----
+# backend, http://localhost:8787
+cd server && npm install && npm run dev
 
-## Milestones
+# Northbeam Portal (insured), http://localhost:6323
+cd apps/business && npm install && npm run dev
 
-Where the build actually stands, not just what's designed. `UI` = clickable with hardcoded data in the console prototypes; `real` = wired to the actual chain/SDK. As of Sept 7, 2026 (6 days to submission) everything below is UI-only — no real backend/logic has been wired yet, by design (UI first, backend second).
-
-```
-Agent Insure
-├── 0. Foundation & Access                         ⚠ blocking — nothing below goes UI → real without this
-│   ├── Hedera testnet account provisioned
-│   ├── Sepolia RPC key + testnet ETH (separate chain from Hedera — easy to forget)
-│   ├── World Selfie Check feature flag requested   ← the one dependency outside our control, unknown lead time
-│   └── ENS lookups pointed at the hackathon's dedicated Sepolia deployment (not the public ENS beta)
-│
-├── 1. Northbeam Portal — "Operate & Recover" (the insured)
-│   ├── 1.1 Provision & Operate
-│   │   ├── Set Up Spending Rules For AI Agents      [UI ✔ · ENS write ☐]
-│   │   └── Agent Pays Vendors                       [UI ✔ · Hedera x402 + HCS ☐]
-│   ├── 1.2 Attack & Detection
-│   │   └── Bad Payment Happens                      [UI ✔ · real prompt-injected agent ☐]
-│   └── 1.3 Claim & Payout
-│       ├── Notice + File                            [UI ✔]
-│       ├── Prove Identity                           [UI ✔ mocked scan · real World SDK ☐]
-│       └── Receive Payout                           [UI ✔ · real Hedera payout ☐]
-│
-├── 2. Agent Insure HQ — "Investigate & Pay Claims" (the insurer)
-│   ├── 2.1 Investigate                              [UI ✔ · real Mirror Node + verdict logic ☐]
-│   └── 2.2 Payout                                   [UI ✔ · real payout execution ☐]
-│
-├── 3. Judging Compliance Deliverables               ← paperwork, not product
-│   ├── Hedera: one real end-to-end x402-gated paid request via Blocky402
-│   ├── ENS: fix "Permissioned Resolver" → Enhanced Access Control, demo a real on-chain record
-│   └── World: required feedback doc (SelfieCheck docs / Sandbox edge cases) — graded, not optional
-│
-└── 4. Submission Package
-    ├── README finalized (architecture diagrams done — fold in sponsor-proof sections)
-    ├── Demo video (walks the exact story the UI prototypes already tell)
-    └── Repo cleanup (journey-tracker stays internal, not part of graded scope)
+# Agent Insure HQ (insurer), http://localhost:6324
+cd apps/hq && npm install && npm run dev
 ```
 
-Not a milestone, but a standing decision: the AI-router idea (see "Rejected / explored ideas" below — kept as a live fallback, not rejected outright) gets picked up only if a concrete trigger date passes without branch 1–2 UI being solid. That trigger date isn't set yet.
+End to end tests (needs the three apps above already running):
 
-Design direction for branches 1–2's UI is specified in `references/design.md` — two separate apps (Northbeam, Agent Insure), one shared design system, distinct accent colors per company.
-
----
-
-## Event Context — ETHGlobal ETHOnline 2026
-
-### Event basics
-
-- **Dates:** September 4 – 16, 2026, fully online/async
-- **Submission deadline:** Sunday, September 13, 2026, 12:00pm EDT
-- **Build time:** ~9 days from start to submission
-
-**Judging mechanism** — two separate tracks, this matters for strategy:
-
-1. **Sponsor prize tracks (where the money comes from)** — judged asynchronously by each sponsor independently, based on GitHub repo, README, and demo video. No live presentation required. Most prize money is paid out to projects that never present live.
-2. **General/overall track** — async screening first; top ~20% of all submissions advance to live judging (7 min: 4 min demo + 3 min Q&A, in a video-call "judging room"). Not required to win sponsor money.
-
-Judging criteria (both tracks): Technicality, Originality, Practicality, Usability (UI/UX/DX), WOW factor.
-
-**Practical implication:** prioritize a clean repo + README + demo video that explicitly proves each sponsor's literal requirement is met. Live-pitch prep is a bonus, not the main path to prize money.
-
-### Chain/sponsor stack — decided
-
-**Hedera + ENS + World are the core build. Arc and The Graph are both explicitly not pursued.**
-
-Why not Arc: its tracks pay out as a pool "split evenly among all qualifying projects," not a fixed amount — given how many teams will chase the "AI agent + stablecoin" theme this cycle, the actual per-team payout is unpredictable and likely diluted below Hedera's flat $2,000. Hedera's track is capped at 3 winners for a guaranteed fixed amount, which is the more predictable target. Adding Arc would also mean a second chain and a second wallet SDK — not worth the added build surface in a 9-day window. Single settlement chain (Hedera) for both the consensus log and the claims payout.
-
-**Why The Graph is not pursued:** InvestigatorAgent's history lookup (pull PayableAgent's past transactions, compare the disputed one against the pattern) doesn't need Graph at all — **Hedera Mirror Node**, Hedera's own built-in indexer, already serves exactly this data live, for free, with no API key. Mirror Node isn't a fallback for a missing subgraph; it's the direct, zero-extra-infra way to read this data, since Hedera isn't on Graph's hosted network in the first place. Using Graph instead would mean standing up your own `graph-node` + Postgres + IPFS, wiring it to Hedera's JSON-RPC relay, and writing a subgraph manifest from scratch — real new infrastructure, not an SDK call — purely to re-derive data Mirror Node already hands you. Worse, the published qualification text for Graph's AI tracks requires you to *"consume live data from a Graph provider, for example Subgraph Studio... or The Graph Market"* and disqualifies *"mocked, local-only, or static datasets"* — a privately self-hosted node only the team's own agent ever queries is a real risk of not even qualifying once built. Not worth the build risk or the redundant infra.
-
-### Target sponsors & prize tracks
-
-| Sponsor | Track | Prize | Requirement |
-|---|---|---|---|
-| Hedera | AI & Agentic Payments | $6,000 total (up to 3 teams × $2,000 fixed) | "Host a live x402-gated service on Hedera testnet or mainnet, settled through the Blocky402 facilitator. Build a platform or agent that consumes that service and completes at least one real paid request end to end." Must be a real AI judgment call gating the payment, not deterministic automation |
-| ENS | Best Use of ENSv2 | $4,500 | Bonus: "AI agents as namespaces with delegated permissions" |
-| ENS | Best ENSv2 Integration (Continuity) | $500 | Not our track (continuity only) |
-| World | Selfie Check | $3,500 | Use Selfie Check (or a compatible World ID credential flow) as a real risk/eligibility/fairness/continuity/abuse-prevention signal — not cosmetic. Requires the World ID Sandbox App for the demo, plus a feedback document on the SelfieCheck docs, Developer Portal, and Sandbox App edge cases |
-
-**Three sponsors, one submission — $14,000 addressable.** World was added after identifying a real gap in the claims flow (Guardian, above), not to collect an extra logo. The Graph is not pursued — see above.
-
-**Not pursued — Arc (for reference):** Best DeFi Stablecoin-Native Pool ($2,500 pool), Best Agentic Economy w/ Circle Agent Stack ($2,500 pool), Launch on Arc Testnet & Push to Mainnet ($5,000 pool) — all three split evenly among all qualifying projects, all require a working frontend + backend + architecture diagram + video. Revisit only if Hedera+ENS+World core is done early and there's real time left.
-
-Full prize list: https://ethglobal.com/events/ethonline2026/prizes
+```bash
+npm install
+npm run test:e2e
+```
 
 ---
 
-## Rejected / explored ideas (for reference, do not reuse)
+## Architecture
 
-- **Invoice underwriting agent** — too close to Orbbit's actual business, explicitly ruled out.
-- **Media/content licensing agent** — too low-velocity (one license = one transaction), doesn't demo an "economy."
-- **AI tool-calling router/marketplace** — solid technical fit (Graph reputation from real payment history, Hedera x402 per-call, Arc nanopayments) but developer/infra-facing, not a "normal person" use case. Kept as a fallback if the insurance idea proves too hard to build in time.
-- **Physical device rental (Paybot-style)** — proven pattern (a real ETHGlobal Buenos Aires finalist), but explicitly rejected as unoriginal/derivative.
-- **Cold-chain / IoT sensor tracking (ColdProof-adjacent)** — rejected as too close to an existing real project; see the ColdProof lesson above instead.
+```mermaid
+flowchart TD
+    subgraph NORTHBEAM["Northbeam Distributors (insured)"]
+        PA["PayableAgent pays vendors<br/>under a locked ENS rule"]
+        GUARD["Guardian proves it's really them<br/>with a live World face scan"]
+    end
+    subgraph ATTACKER["External attacker"]
+        MAL["Hides a fake instruction<br/>inside a routine invoice"]
+    end
+    subgraph INSURER["Agent Insure (insurer)"]
+        INV["InvestigatorAgent checks the payment<br/>against Hedera history and the ENS rule"]
+        PAY["PayoutAgent pays from<br/>the shared pool on Hedera"]
+    end
 
-## Application answer draft
+    PA -->|"tricked into a wrong payment"| MAL
+    MAL --> GUARD
+    GUARD -->|"claim filed"| INV
+    INV -->|"looks like fraud"| PAY
+    INV -->|"matches normal pattern"| DENY["Claim denied"]
 
-**"What will you be developing at this event?"**
+    style PA fill:#eaf1ff,stroke:#4c82fb,stroke-width:2px
+    style GUARD fill:#fff6e0,stroke:#e0a825,stroke-width:2px
+    style INV fill:#f1edff,stroke:#7c5cff,stroke-width:2px
+    style PAY fill:#f1edff,stroke:#7c5cff,stroke-width:2px
+```
 
-> We're building an insurance protocol for autonomous AI agents that hold and spend money on their own. As agents get real wallets and real spending authority — the exact bet Arc, Hedera, and Circle's Agent Stack are all making — a documented, increasingly common attack (a hidden instruction that manipulates an agent into authorizing a payment its owner never intended) becomes an irreversible loss with zero recourse, since stablecoin transfers can't be charged back the way a credit card can.
->
-> We combine three pieces of infrastructure to fix that. An agent's allowed spending scope — budget cap, approved counterparties — gets written into its ENS identity as an enforceable record, not a display name. Every transaction gets logged immutably through Hedera Consensus Service. Filing a claim requires the company's real, identified human to pass a live World Selfie Check first, so the entire loss-and-claim cycle can't be scripted end to end by software with nobody accountable. Hedera's own Mirror Node surfaces the agent's full transaction history so an AI claims-adjuster can compare the disputed payment against its normal pattern and its declared ENS scope, and if it looks like manipulation rather than a legitimate decision, the claim pays out automatically on Hedera from a shared risk pool.
->
-> It's essentially a fidelity bond — the insurance companies already buy to cover employee theft or fraud — extended to cover an AI agent instead of a human employee.
+---
 
-**"How you got here / what about Web3 is interesting to you"** — open, needs personal input (not written from research).
+## Screenshots
 
-## Open items
+**1. Northbeam locks PayableAgent's spending rule.** Budget cap and approved vendor list, locked on ENS.
 
-- [ ] Personal "how you got into Web3" story for the application (needs actual input, not invented)
-- [ ] Confirm exact hackathon opening time on Sept 4 (only the Sept 13 12pm EDT deadline is confirmed so far)
-- [ ] Decide fallback idea (AI router) trigger point if insurance build proves too slow
-- [ ] Build plan / task breakdown (not yet started)
-- [ ] Budget real time for World's required feedback document (SelfieCheck docs, Developer Portal navigation/search, Sandbox App states/errors/edge cases) — it's graded work, not a paragraph bolted on at the end
-- [ ] If team capacity allows a genuinely separate second project for more prize surface, target sponsors World does NOT already cover here — e.g. 1inch (Aqua App, $5,000) or Uniswap (Stack Contribution, $3,000); avoid Chainlink and Ledger for a fresh build since both list requirements as "coming soon"
+![Setting the AI agent's spending rule](images/set-ai-agent-spending-rule.png)
+
+**2. That rule is a real ENS record onchain**, not just a screen. Anyone can look it up.
+
+![The spending rule as a real ENS record](images/ens-agent-spending-rule.png)
+
+**3. A vendor invoice hides a fake instruction inside it**, invisible to a human, telling PayableAgent to pay a different account.
+
+![A prompt-injected invoice](images/prompt-injected-invoice.png)
+
+**4. The tricked payment is real**, a tiny insurance payment settled through x402 on Hedera, checkable on Hedera's own explorer.
+
+![The x402 insurance payment on Hedera](images/prompt-injected-invoice-x402-insurance.png)
+
+**5. Filing a claim requires a real person.** Guardian scans a code with the World app.
+
+![World QR code required to file a claim](images/human-kyc-required-world-qr-code.png)
+
+**6. World checks that a real human, not a bot, is filing the claim.**
+
+![World's real face-scan check](images/world-popup-proof-human.png)
+
+**7. Agent Insure HQ finds the fraud and pays the claim.** InvestigatorAgent's verdict, then PayoutAgent's payout, from the shared reserve pool.
+
+![Agent Insure HQ investigates and pays the claim](images/insurer-hq-investigate.png)
