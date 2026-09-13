@@ -137,7 +137,7 @@ test.describe('PayoutAgent independently verifies the verdict and executes a rea
       await expect(page.getByRole('heading', { name: `Claim #${clearedClaim.id} — Acme Corp` })).toBeVisible();
 
       await expect(page.getByRole('button', { name: 'Run Payout' })).not.toBeVisible();
-      await expect(page.getByText('Not payable — InvestigatorAgent found no fraud, nothing to reimburse.')).toBeVisible();
+      await expect(page.getByText('Not payable — no fraud confirmed, nothing to reimburse.')).toBeVisible();
     });
 
     await test.step("Northbeam's portal notices the real payout and shows it resolved", async () => {

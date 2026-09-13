@@ -12,6 +12,13 @@ function hashscanTxUrl(transactionId: string): string {
   return `https://hashscan.io/testnet/transaction/${transactionId}`;
 }
 
+// payableagent.agentinsure.eth is a real, registered ENS subname — the same one
+// InvestigatorAgent's ENS read (readApprovedAccount) actually queries. Its Records tab
+// shows the real, locked vendor account directly, independently of anything this app says.
+function ensNameExplorerUrl(): string {
+  return 'https://hackathon-deployment-portal-app.ens-cf.workers.dev/payableagent.agentinsure.eth/records';
+}
+
 function StatusBadge({ claim }: { claim: Claim }) {
   if (claim.status === 'approved') {
     return (
@@ -51,7 +58,6 @@ function ClaimDetail({ claim, onInvestigate, onPay }: ClaimDetailProps) {
       </div>
 
       <div className="mb-5">
-        <div className="mb-3 text-sm font-bold">InvestigatorAgent</div>
         {claim.investigated ? (
           <>
             <span
@@ -62,6 +68,14 @@ function ClaimDetail({ claim, onInvestigate, onPay }: ClaimDetailProps) {
               VERDICT: {claim.verdict}
             </span>
             <div className="mt-2 text-xs text-muted-foreground">{claim.reasoning}</div>
+            <a
+              className="mt-1 inline-block font-mono text-[11px] text-muted-foreground underline hover:text-foreground"
+              href={ensNameExplorerUrl()}
+              target="_blank"
+              rel="noreferrer"
+            >
+              verify the locked vendor account on ENS
+            </a>
           </>
         ) : (
           <Button size="sm" onClick={() => onInvestigate(claim.id)}>
@@ -72,7 +86,6 @@ function ClaimDetail({ claim, onInvestigate, onPay }: ClaimDetailProps) {
 
       {claim.investigated && (
         <div>
-          <div className="mb-3 text-sm font-bold">PayoutAgent</div>
           {claim.status === 'approved' && claim.payoutTxHash ? (
             <a
               href={hashscanTxUrl(claim.payoutTxHash)}
@@ -88,7 +101,7 @@ function ClaimDetail({ claim, onInvestigate, onPay }: ClaimDetailProps) {
             </Button>
           ) : (
             <div className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-              Not payable — InvestigatorAgent found no fraud, nothing to reimburse.
+              Not payable — no fraud confirmed, nothing to reimburse.
             </div>
           )}
         </div>

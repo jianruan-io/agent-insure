@@ -2,10 +2,24 @@ import { useState } from 'react';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
-import { useStore, type ActivityEntry } from '../lib/store.js';
+import { useStore, type ActivityEntry, type ClaimEntry } from '../lib/store.js';
 
 function money(amount: number) {
-  return `$${amount.toLocaleString()}`;
+  return `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** The server derives every row's `time` from the real vendor payment transaction's own
+ *  consensus timestamp — rendered in the viewer's own local time, never a placeholder
+ *  like "Just now". If this ever renders "Invalid Date", it's stale browser data from
+ *  before this — click "Reset Demo" to clear it. */
+function formatTimestamp(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 }
 
 /** Real proof lives on Hedera's own public explorer — verified against Hedera's docs,
@@ -14,16 +28,15 @@ function hashscanTxUrl(transactionId: string): string {
   return `https://hashscan.io/testnet/transaction/${transactionId}`;
 }
 
-/** The x402 coverage fee is charged in HBAR — the raw amount PayableAgent's backend
- *  sends is in tinybars (1 HBAR = 10^8 tinybars), e.g. "10000000" is 0.1 HBAR. */
-function formatFeeAmount(rawAmount: string): string {
-  return `${(Number(rawAmount) / 100_000_000).toFixed(2)} ℏ`;
+/** Every Hedera account has its own real, public HashScan page — balance, memo, and its
+ *  own transaction history, independent of anything this app says about it. */
+function hashscanAccountUrl(accountId: string): string {
+  return `https://hashscan.io/testnet/account/${accountId}`;
 }
 
-/** The real invoice document PayableAgent read, rendered exactly as authored — a
- *  concealed instruction stays visually invisible against the document's own white
- *  background, same as it was for PayableAgent, until selected. */
-function InvoiceModal({ html, onClose }: { html: string; onClose: () => void }) {
+/** A single, generic modal shell — every "View …" column opens one of these rather than
+ *  stacking its content inline into the row. */
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -31,112 +44,197 @@ function InvoiceModal({ html, onClose }: { html: string; onClose: () => void }) 
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div
-        data-testid="invoice-modal"
-        className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-border bg-card p-6 shadow-[0_12px_32px_rgba(0,0,0,.16)]"
-      >
+      <div className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-border bg-card p-6 shadow-[0_12px_32px_rgba(0,0,0,.16)]">
         <div className="mb-3 flex shrink-0 items-center justify-between">
-          <h2 className="text-sm font-semibold">Invoice as PayableAgent read it</h2>
+          <h2 className="text-sm font-semibold">{title}</h2>
           <button type="button" className="text-muted-foreground hover:text-foreground" onClick={onClose}>
             close
           </button>
         </div>
-        <p className="mb-3 shrink-0 text-xs text-muted-foreground">
-          Select all (⌘/Ctrl+A) inside the invoice below to reveal any concealed text.
-        </p>
-        <div
-          className="min-h-0 overflow-y-auto rounded-lg border border-border bg-white p-4 text-black"
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
+        {children}
       </div>
     </div>
   );
 }
 
-/** One row of the Activity Feed table, plus its collapsible reasoning row underneath —
- *  mirrors the published prototype's `activityRow()`. */
+/** The real invoice document PayableAgent read, rendered exactly as authored — on a
+ *  poisoned row, a concealed instruction stays visually invisible against the document's
+ *  own white background, same as it was for PayableAgent, until selected. Every row has
+ *  one — the clean invoice is a real artifact too, not just the poisoned one. */
+function InvoiceModal({ entry, onClose }: { entry: ActivityEntry; onClose: () => void }) {
+  return (
+    <Modal title={`Invoice as PayableAgent read it — ${entry.flagged ? 'poisoned' : 'normal'}`} onClose={onClose}>
+      {entry.flagged ? (
+        <p className="mb-3 shrink-0 text-xs text-muted-foreground">
+          Select all (⌘/Ctrl+A) inside the invoice below to reveal any concealed text.
+        </p>
+      ) : null}
+      <div
+        data-testid="invoice-modal"
+        className="min-h-0 overflow-y-auto rounded-lg border border-border bg-white p-4 text-black"
+        dangerouslySetInnerHTML={{ __html: entry.invoiceHtml! }}
+      />
+    </Modal>
+  );
+}
+
+/**
+ * The real x402 protocol exchange behind this row's insurance payment. Two clearly
+ * separate things, never merged: the protocol payload itself (the raw request/response
+ * JSON this HTTP exchange actually produced) versus the onchain proof that it was really
+ * paid (a link to the real settlement transaction on HashScan, not just this payload
+ * saying `success: true`).
+ */
+function X402Modal({ entry, onClose }: { entry: ActivityEntry; onClose: () => void }) {
+  const x402 = entry.x402!;
+  const requirements = x402.challenge.accepts[0];
+  const rawChallenge = {
+    x402Version: x402.challenge.x402Version,
+    accepts: [
+      {
+        scheme: requirements?.scheme,
+        network: requirements?.network,
+        asset: requirements?.asset,
+        payTo: requirements?.payTo,
+        amount: requirements?.amount,
+        extra: { feePayer: requirements?.extra?.feePayer },
+      },
+    ],
+  };
+  return (
+    <Modal title="x402 insurance payment" onClose={onClose}>
+      <div className="mb-4 flex flex-wrap items-center gap-1 font-mono text-[10px] text-muted-foreground">
+        <span className="rounded bg-muted px-1.5 py-0.5">POST /api/coverage/charge</span>
+        <span>→</span>
+        <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-destructive">402 Payment Required</span>
+        <span>→</span>
+        <span className="rounded bg-muted px-1.5 py-0.5">signed by PayableAgent</span>
+        <span>→</span>
+        <span className="rounded bg-muted px-1.5 py-0.5">verified by Blocky402</span>
+        <span>→</span>
+        <span className={`rounded px-1.5 py-0.5 ${x402.settlement.success ? 'bg-[var(--success)]/10 text-[var(--success)]' : 'bg-destructive/10 text-destructive'}`}>
+          {x402.settlement.success ? 'settled' : 'settlement failed'}
+        </span>
+      </div>
+
+      <div className="mb-4 rounded-lg border border-border p-3">
+        <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          1. Protocol payload — the raw HTTP exchange
+        </div>
+        <p className="mb-2 text-xs text-muted-foreground">
+          The real 402 challenge <code>/api/coverage/charge</code> returned before any payment was attached:
+        </p>
+        <pre className="overflow-x-auto rounded bg-muted/60 p-2 font-mono text-[10px] leading-snug text-muted-foreground">
+          {JSON.stringify(rawChallenge, null, 2)}
+        </pre>
+      </div>
+
+      <div className="rounded-lg border border-[var(--success)]/30 bg-[var(--success)]/5 p-3">
+        <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--success)]">
+          2. Onchain proof — the real settlement
+        </div>
+        <p className="mb-2 text-xs text-muted-foreground">
+          Not just this payload's own <code>success: true</code> — the real transaction it produced, independently checkable on Hedera's own explorer:
+        </p>
+        <a
+          className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
+          href={hashscanTxUrl(entry.insurancePaymentTxHash)}
+          target="_blank"
+          rel="noreferrer"
+        >
+          View the {money(entry.insurancePaymentUsd)} mUSDC settlement on HashScan →
+        </a>
+      </div>
+    </Modal>
+  );
+}
+
+type ActiveModal = { kind: 'invoice' | 'x402'; entryId: string } | null;
+
+/** One row of the Activity Feed table — one column per datum, nothing combined into a
+ *  shared cell. The vendor payment and the insurance payment are two entirely separate
+ *  real transactions, always shown as two separate column pairs, never merged. Every
+ *  column with a real onchain counterpart links straight to it. */
 function ActivityRow({
   entry,
-  onToggleReason,
-  onViewInvoice,
+  claim,
+  onOpenModal,
 }: {
   entry: ActivityEntry;
-  onToggleReason: (id: string) => void;
-  onViewInvoice: (id: string) => void;
+  claim: ClaimEntry | undefined;
+  onOpenModal: (modal: ActiveModal) => void;
 }) {
-  const hasRealProof = Boolean(entry.feeTxHash && entry.paymentTxHash);
   return (
-    <>
-      <tr className="border-b border-border/70 last:border-0 hover:bg-muted/40">
-        <td className="whitespace-nowrap p-3 text-xs text-muted-foreground">{entry.time}</td>
-        <td className="p-3 text-sm">
-          {entry.flagged ? `“${entry.vendor}”` : entry.vendor}
-          <div className="font-mono text-xs text-muted-foreground">{entry.account}</div>
-          {entry.flagged ? (
-            <div className="text-xs text-destructive">
-              new account, never used before{entry.claimed ? ' · claim filed' : ''}
-            </div>
-          ) : null}
-        </td>
-        <td className="p-3 text-right text-sm tabular-nums">{money(entry.amount)}</td>
-        <td className="p-3 text-right text-xs tabular-nums text-muted-foreground">
-          {hasRealProof ? (
-            <a
-              className="underline decoration-dotted hover:text-foreground"
-              href={hashscanTxUrl(entry.feeTxHash!)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {formatFeeAmount(entry.feeAmount!)}
-            </a>
-          ) : (
-            '$0.02'
-          )}{' '}
-          <Badge variant="hedera">Hedera</Badge>
-        </td>
-        <td className="p-3 text-right">
-          <Badge variant={entry.flagged ? 'destructive' : 'success'}>{entry.flagged ? 'Flagged' : 'OK'}</Badge>
-        </td>
-        <td className="p-3 text-right">
+    <tr className="border-b border-border/70 last:border-0 hover:bg-muted/40">
+      <td className="whitespace-nowrap p-3 text-xs text-muted-foreground">
+        <a className="underline decoration-dotted hover:text-foreground" href={hashscanTxUrl(entry.vendorPaymentTxHash)} target="_blank" rel="noreferrer">
+          {formatTimestamp(entry.time)}
+        </a>
+      </td>
+      <td className="p-3 text-sm">{entry.vendor}</td>
+      <td className="p-3 font-mono text-xs">
+        <a className="underline decoration-dotted hover:text-foreground" href={hashscanAccountUrl(entry.account)} target="_blank" rel="noreferrer">
+          {entry.account}
+        </a>
+      </td>
+      <td className="p-3 text-right">
+        {!entry.flagged ? (
+          <Badge variant="success">OK</Badge>
+        ) : claim?.status === 'approved' && claim.payoutTxHash ? (
+          <a href={hashscanTxUrl(claim.payoutTxHash)} target="_blank" rel="noreferrer">
+            <Badge variant="success">Reimbursed ✓</Badge>
+          </a>
+        ) : claim ? (
+          <Badge variant="warning">Claim filed</Badge>
+        ) : (
+          <Badge variant="destructive">Flagged</Badge>
+        )}
+      </td>
+      <td className="p-3 text-right text-sm tabular-nums">{money(entry.vendorPaymentUsd)}</td>
+      <td className="p-3 text-xs tabular-nums">
+        <a
+          className="underline decoration-dotted hover:text-foreground"
+          href={hashscanTxUrl(entry.vendorPaymentTxHash)}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {entry.vendorPaymentTxHash.slice(0, 14)}…
+        </a>
+      </td>
+      <td className="p-3 text-right text-sm tabular-nums text-muted-foreground">{money(entry.insurancePaymentUsd)}</td>
+      <td className="p-3 text-xs tabular-nums">
+        <a
+          className="underline decoration-dotted hover:text-foreground"
+          href={hashscanTxUrl(entry.insurancePaymentTxHash)}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {entry.insurancePaymentTxHash.slice(0, 14)}…
+        </a>
+      </td>
+      <td className="p-3 text-right">
+        <button
+          type="button"
+          className="text-xs font-semibold text-primary hover:underline"
+          onClick={() => onOpenModal({ kind: 'invoice', entryId: entry.id })}
+        >
+          View
+        </button>
+      </td>
+      <td className="p-3 text-right">
+        {entry.x402 ? (
           <button
             type="button"
             className="text-xs font-semibold text-primary hover:underline"
-            onClick={() => onToggleReason(entry.id)}
+            onClick={() => onOpenModal({ kind: 'x402', entryId: entry.id })}
           >
-            {entry.expanded ? 'hide' : 'reason'}
+            View
           </button>
-        </td>
-      </tr>
-      {entry.expanded ? (
-        <tr className="border-b border-border/70 bg-muted/30">
-          <td className="p-3 text-xs text-muted-foreground" colSpan={6}>
-            <div>{entry.reasoning}</div>
-            {hasRealProof ? (
-              <div className="mt-2 flex flex-col gap-0.5 font-mono text-[11px]">
-                <a
-                  className="underline decoration-dotted hover:text-foreground"
-                  href={hashscanTxUrl(entry.paymentTxHash!)}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  vendor payment tx ({money(entry.amount)} mUSDC): {entry.paymentTxHash!.slice(0, 18)}…
-                </a>
-                {entry.hcsSequenceNumber ? <span>logged to Hedera Consensus Service · seq #{entry.hcsSequenceNumber}</span> : null}
-              </div>
-            ) : null}
-            {entry.flagged && entry.invoiceHtml ? (
-              <button
-                type="button"
-                className="mt-2 text-xs font-semibold text-primary hover:underline"
-                onClick={() => onViewInvoice(entry.id)}
-              >
-                View invoice
-              </button>
-            ) : null}
-          </td>
-        </tr>
-      ) : null}
-    </>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )}
+      </td>
+    </tr>
   );
 }
 
@@ -148,15 +246,15 @@ function ActivityRow({
  * one open dispute at a time) and the reverse-chronological feed table.
  */
 export function Activity() {
-  const { state, simulateNormalInvoice, simulatePoisonedInvoice, toggleReason } = useStore();
-  const { rules, activity, activitySimulating, activitySimulateError } = state;
+  const { state, simulateNormalInvoice, simulatePoisonedInvoice } = useStore();
+  const { rules, activity, claims, activitySimulating, activitySimulateError } = state;
   const hasOpenFlag = activity.some((a) => a.flagged && !a.claimed);
   const rows = activity.slice().reverse();
-  const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
-  const viewingInvoice = activity.find((a) => a.id === viewingInvoiceId);
+  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+  const activeEntry = activeModal ? activity.find((a) => a.id === activeModal.entryId) : undefined;
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="mx-auto min-w-0 max-w-6xl">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Activity Feed</h1>
@@ -194,30 +292,42 @@ export function Activity() {
         </p>
       ) : null}
 
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+      <Card className="min-w-0">
+        <div className="min-w-0 overflow-x-auto">
+          <table className="w-full min-w-[1100px] text-sm">
             <thead>
               <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground">
                 <th className="p-3 font-semibold">Time</th>
-                <th className="p-3 font-semibold">Payment</th>
-                <th className="p-3 text-right font-semibold">Amount</th>
-                <th className="p-3 text-right font-semibold">Fee</th>
+                <th className="p-3 font-semibold">Counterparty</th>
+                <th className="p-3 font-semibold">Hedera Address</th>
                 <th className="p-3 text-right font-semibold">Status</th>
-                <th className="p-3" />
+                <th className="p-3 text-right font-semibold">Vendor Payment ($)</th>
+                <th className="p-3 font-semibold">Vendor Payment Tx</th>
+                <th className="p-3 text-right font-semibold">Insurance Payment ($)</th>
+                <th className="p-3 font-semibold">Insurance Payment Tx</th>
+                <th className="p-3 text-right font-semibold">Invoice</th>
+                <th className="p-3 text-right font-semibold">x402 Payload</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((entry) => (
-                <ActivityRow key={entry.id} entry={entry} onToggleReason={toggleReason} onViewInvoice={setViewingInvoiceId} />
+                <ActivityRow
+                  key={entry.id}
+                  entry={entry}
+                  claim={claims.find((c) => c.id === entry.claimId)}
+                  onOpenModal={setActiveModal}
+                />
               ))}
             </tbody>
           </table>
         </div>
       </Card>
 
-      {viewingInvoice?.invoiceHtml ? (
-        <InvoiceModal html={viewingInvoice.invoiceHtml} onClose={() => setViewingInvoiceId(null)} />
+      {activeModal?.kind === 'invoice' && activeEntry?.invoiceHtml ? (
+        <InvoiceModal entry={activeEntry} onClose={() => setActiveModal(null)} />
+      ) : null}
+      {activeModal?.kind === 'x402' && activeEntry?.x402 ? (
+        <X402Modal entry={activeEntry} onClose={() => setActiveModal(null)} />
       ) : null}
     </div>
   );

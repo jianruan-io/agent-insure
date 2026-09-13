@@ -30,10 +30,12 @@ export function createWorldRequest() {
   return {
     app_id: appId,
     action,
-    // World ID 4.0's managed-RP setup registers actions under "staging"/"production" —
-    // "sandbox" was the legacy term and matches no registered action for a v4 RP,
-    // confirmed via the Developer Portal API (get_app_config's real actions_v4 list).
-    environment: process.env.WORLD_ENVIRONMENT || 'staging',
+    // Selfie Check (`selfieCheckLegacy`) runs on World ID 3.0, not the v4 managed-RP
+    // actions checked via the Developer Portal API — its own docs (docs.world.org/
+    // world-id/sandbox/sandbox-access) say plainly: "Set environment: sandbox in your
+    // IDKit configuration" to test against the Sandbox World ID app. "staging" was a
+    // v4-only concept mistakenly carried over to this v3 credential.
+    environment: process.env.WORLD_ENVIRONMENT || 'sandbox',
     rp_context: {
       rp_id: rpId,
       nonce,

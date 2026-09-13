@@ -20,23 +20,38 @@ export interface ActivityEntry {
   vendor: string;
   /** The real Hedera account the payment actually reached — not the old ENS-scope address. */
   account: string;
-  amount: number;
   time: string;
   flagged: boolean;
   /** True once a claim has been filed against this row — the flagged banner then adds
    *  "· claim filed", and it stops counting as the one open flag a new claim can target. */
   claimed: boolean;
-  /** Whether this row's "reason" toggle is currently expanded. */
-  expanded: boolean;
+  /** The claim filed against this row, if any — lets the Activity feed look up that
+   *  claim's live status (and its real payout tx, once Agent Insure pays it) directly
+   *  from `state.claims`, rather than duplicating payout data onto this row. */
+  claimId?: string;
   reasoning: string;
-  /** Real proof, only present on rows created by the real payment flow — the two seed
-   *  rows and anything from before this field existed simply don't have it. */
-  feeAmount?: string;
-  feeTxHash?: string;
-  paymentTxHash?: string;
-  hcsSequenceNumber?: string;
-  /** The real invoice document PayableAgent read, hidden instruction included — only
-   *  present on a flagged row, straight from the server's real response. */
+  /** The actual invoice payment — real mUSDC, PayableAgent → the vendor (or the attacker's
+   *  account, on a poisoned row). A distinct, separate transaction from the insurance
+   *  payment below, both in what it's for and in its own real transaction hash. */
+  vendorPaymentUsd: number;
+  vendorPaymentTxHash: string;
+  /** The x402 insurance/coverage toll — also real mUSDC, but a small fixed amount charged
+   *  to Agent Insure's reserve pool, unrelated in size to the invoice. A separate real
+   *  transaction, settled before the vendor payment is ever attempted. */
+  insurancePaymentUsd: number;
+  insurancePaymentTxHash: string;
+  /** The real x402 "402 Payment Required" protocol payload PayableAgent received, and the
+   *  facilitator's real settlement outcome — straight from the server, never invented. The
+   *  settlement's own onchain proof is `insurancePaymentTxHash` above, not this payload. */
+  x402?: {
+    challenge: {
+      x402Version: number;
+      accepts: Array<{ scheme: string; network: string; asset: string; payTo: string; amount: string; extra?: { feePayer?: string } }>;
+    };
+    settlement: { success: boolean; network: string };
+  };
+  /** The real invoice document PayableAgent read, hidden instruction included on a
+   *  poisoned row — straight from the server's real response, present on every row. */
   invoiceHtml?: string;
 }
 
@@ -86,10 +101,6 @@ const STORAGE_KEY = 'agent-insure-business-v1';
 // Both Northbeam and Agent Insure HQ run on localhost during the hackathon — see SelfieModal.tsx.
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8787';
 
-// Seed rows predate the real payment pipeline — their reasoning is fixed demo copy, not
-// PayableAgent's own output. Every row from the real flow carries the server's real reasoning.
-const SEED_REASONING = 'Matches the locked vendor list — same account as every past payment. Approved.';
-
 function seedState(): StoreState {
   return {
     rules: {
@@ -104,30 +115,10 @@ function seedState(): StoreState {
       lockStatus: 'idle',
       lockError: null,
     },
-    activity: [
-      {
-        id: 'a1',
-        vendor: 'Acme Corp',
-        account: '0x492b…c11a',
-        amount: 500,
-        time: 'Mon 9:03 AM',
-        flagged: false,
-        claimed: false,
-        expanded: false,
-        reasoning: SEED_REASONING,
-      },
-      {
-        id: 'a2',
-        vendor: 'Acme Corp',
-        account: '0x492b…c11a',
-        amount: 500,
-        time: 'Wed 2:15 PM',
-        flagged: false,
-        claimed: false,
-        expanded: false,
-        reasoning: SEED_REASONING,
-      },
-    ],
+    // No fake starter rows — every row on this table comes from a real "Simulate…" click
+    // and its real Hedera + x402 proof, never placeholder data with a made-up address or
+    // fee that doesn't match the real ones the real flow produces.
+    activity: [],
     claims: [
       {
         id: 'c0',
@@ -140,7 +131,7 @@ function seedState(): StoreState {
         payoutTxHash: null,
       },
     ],
-    nextActId: 3,
+    nextActId: 1,
     activitySimulating: false,
     activitySimulateError: null,
   };
@@ -155,9 +146,15 @@ function loadState(): StoreState {
     if (!raw) return seedState();
     const parsed = JSON.parse(raw) as Partial<StoreState> | null;
     if (!parsed || !parsed.rules || !parsed.activity || !parsed.claims) return seedState();
+    // A row from before a schema change (e.g. the old `amount`/`feeAmount` fields, before
+    // they became `vendorPaymentUsd`/`insurancePaymentUsd`) would otherwise crash the whole
+    // page the moment it tries to render — drop the whole activity list rather than ship a
+    // white screen for one stale row. Persisted state is a demo convenience, never a source
+    // of truth worth preserving across a real field rename.
+    const activity = parsed.activity.every((entry) => typeof entry.vendorPaymentUsd === 'number') ? parsed.activity : [];
     // Merge onto a fresh seed's `rules` so a browser that persisted state before this
     // issue's new fields existed doesn't end up with `undefined` lock-flow fields.
-    return { ...seedState(), ...parsed, rules: { ...seedState().rules, ...parsed.rules } };
+    return { ...seedState(), ...parsed, activity, rules: { ...seedState().rules, ...parsed.rules } };
   } catch {
     return seedState();
   }
@@ -171,7 +168,6 @@ type Action =
   | { type: 'simulate-start' }
   | { type: 'simulate-success'; entry: ActivityEntry }
   | { type: 'simulate-error'; message: string }
-  | { type: 'toggle-reason'; id: string }
   | { type: 'file-claim'; activityId: string; claimId: string }
   | { type: 'complete-selfie'; claimId: string }
   | { type: 'claim-payout-confirmed'; claimId: string; payoutTxHash: string }
@@ -216,19 +212,13 @@ function reducer(state: StoreState, action: Action): StoreState {
     case 'simulate-error':
       return { ...state, activitySimulating: false, activitySimulateError: action.message };
 
-    case 'toggle-reason':
-      return {
-        ...state,
-        activity: state.activity.map((a) => (a.id === action.id ? { ...a, expanded: !a.expanded } : a)),
-      };
-
     case 'file-claim': {
       const source = state.activity.find((a) => a.id === action.activityId);
       if (!source) return state;
       const claim: ClaimEntry = {
         id: action.claimId,
         vendor: source.vendor,
-        amount: source.amount,
+        amount: source.vendorPaymentUsd,
         time: source.time,
         seed: false,
         status: 'awaiting-identity',
@@ -237,7 +227,9 @@ function reducer(state: StoreState, action: Action): StoreState {
       };
       return {
         ...state,
-        activity: state.activity.map((a) => (a.id === action.activityId ? { ...a, claimed: true } : a)),
+        activity: state.activity.map((a) =>
+          a.id === action.activityId ? { ...a, claimed: true, claimId: action.claimId } : a
+        ),
         claims: [...state.claims, claim],
       };
     }
@@ -286,12 +278,12 @@ interface StoreContextValue {
   syncRulesFromChain: () => Promise<void>;
   simulateNormalInvoice: () => Promise<void>;
   simulatePoisonedInvoice: () => Promise<void>;
-  toggleReason: (id: string) => void;
   fileClaim: (activityId: string) => Promise<void>;
   completeSelfie: (claimId: string) => void;
-  /** Re-seeds the whole store — the real equivalent of the prototype's `reset-demo`
-   *  action, now that there's actual cross-screen state worth resetting. */
-  resetDemo: () => void;
+  /** Re-seeds the whole store and clears the shared backend claims record — the real
+   *  equivalent of the prototype's `reset-demo` action, now that there's actual
+   *  cross-screen (and cross-app, via Agent Insure HQ) state worth resetting. */
+  resetDemo: () => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null);
@@ -362,16 +354,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         id: `a${state.nextActId}`,
         vendor: body.vendor,
         account: body.account,
-        amount: body.amount,
-        time: 'Just now',
+        time: body.time,
         flagged: body.flagged,
         claimed: false,
-        expanded: false,
         reasoning: body.reasoning,
-        feeAmount: body.feeAmount,
-        feeTxHash: body.feeTxHash,
-        paymentTxHash: body.paymentTxHash,
-        hcsSequenceNumber: body.hcsSequenceNumber,
+        vendorPaymentUsd: body.vendorPaymentUsd,
+        vendorPaymentTxHash: body.vendorPaymentTxHash,
+        insurancePaymentUsd: body.insurancePaymentUsd,
+        insurancePaymentTxHash: body.insurancePaymentTxHash,
+        x402: body.x402,
         invoiceHtml: body.invoiceHtml,
       };
       dispatch({ type: 'simulate-success', entry });
@@ -422,7 +413,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     simulateNormalInvoice: () => simulateInvoice('normal'),
     simulatePoisonedInvoice: () => simulateInvoice('poisoned'),
-    toggleReason: (id) => dispatch({ type: 'toggle-reason', id }),
     fileClaim: async (activityId) => {
       const source = state.activity.find((a) => a.id === activityId);
       if (!source) return;
@@ -431,14 +421,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         // The real disputed destination — what InvestigatorAgent later compares against the
         // vendor's ENS-locked account, not just the vendor's name.
-        body: JSON.stringify({ vendor: source.vendor, amount: source.amount, activityId, account: source.account }),
+        body: JSON.stringify({ vendor: source.vendor, amount: source.vendorPaymentUsd, activityId, account: source.account }),
       });
       if (!response.ok) throw new Error('Could not file the claim.');
       const claim = await response.json();
       dispatch({ type: 'file-claim', activityId, claimId: claim.id });
     },
     completeSelfie: (claimId) => dispatch({ type: 'complete-selfie', claimId }),
-    resetDemo: () => dispatch({ type: 'reset' }),
+    resetDemo: async () => {
+      try {
+        await fetch(`${API_URL}/api/claims`, { method: 'DELETE' });
+      } catch {
+        // Best-effort — the local reset below still gives a clean demo state even if
+        // the shared backend record couldn't be cleared (e.g. server not running yet).
+      }
+      dispatch({ type: 'reset' });
+    },
   };
 
   return createElement(StoreContext.Provider, { value }, children);
