@@ -1,4 +1,4 @@
-# Agent Insure: A Fidelity Bond for Autonomous AI Agents
+# Agent Insure: Insurance for AI Agents Against LLM Prompt-Injection Fraud, Built on Hedera, ENS and World
 
 ## Live Demo
 
